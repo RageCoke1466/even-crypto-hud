@@ -1,0 +1,17 @@
+{
+  "package_id": "com.alphabuilderlab.cryptohud",
+  "edition": "202601",
+  "name": "Crypto HUD",
+  "version": "0.1.6",
+  "min_app_version": "2.0.0",
+  "min_sdk_version": "0.0.10",
+  "entrypoint": "index.html",
+  "permissions": [
+    {
+      "name": "network",
+      "desc": "Fetches read-only watchlist price data from CoinGecko.",
+      "whitelist": ["https://api.coingecko.com"]
+    }
+  ],
+  "supported_languages": ["en"]
+}
