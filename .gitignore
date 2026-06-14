@@ -5,3 +5,4 @@ coverage/
 even-crypto.ehpk
 .vite/
 docs/
+.docs

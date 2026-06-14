@@ -1,0 +1,162 @@
+name: Release Package
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-package-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  detect-version:
+    name: Detect version release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      should_release: ${{ steps.version.outputs.should_release }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+
+      - name: Compare package version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+
+          current_version="$(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version)")"
+          app_version="$(node -e "console.log(JSON.parse(require('fs').readFileSync('app.json', 'utf8')).version)")"
+          previous_version=""
+
+          if [ "$current_version" != "$app_version" ]; then
+            echo "::error::package.json version ($current_version) must match app.json version ($app_version)."
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            zero_sha="0000000000000000000000000000000000000000"
+
+            if [ -n "${BEFORE_SHA:-}" ] && [ "$BEFORE_SHA" != "$zero_sha" ] && git cat-file -e "$BEFORE_SHA:package.json" 2>/dev/null; then
+              previous_version="$(git show "$BEFORE_SHA:package.json" | node -e "let input = ''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => console.log(JSON.parse(input).version));")"
+            fi
+
+            if [ "$current_version" = "$previous_version" ]; then
+              should_release=false
+            else
+              should_release=true
+            fi
+          else
+            should_release=true
+          fi
+
+          tag="v$current_version"
+
+          {
+            echo "should_release=$should_release"
+            echo "version=$current_version"
+            echo "tag=$tag"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$should_release" = "true" ]; then
+            echo "Release required for $tag"
+          else
+            echo "No release required; package version remains $current_version"
+          fi
+
+  package:
+    name: Build package
+    runs-on: ubuntu-latest
+    needs: detect-version
+    if: needs.detect-version.outputs.should_release == 'true'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        run: pnpm test
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Pack
+        run: pnpm run pack
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: even-crypto-package
+          path: even-crypto.ehpk
+          if-no-files-found: error
+
+  upload-release-asset:
+    name: Upload package to release
+    runs-on: ubuntu-latest
+    needs: [detect-version, package]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: even-crypto-package
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          TAG: ${{ needs.detect-version.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "push" ] && gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists. Bump package.json to a new version before publishing."
+            exit 1
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" even-crypto.ehpk --clobber
+          else
+            gh release create "$TAG" even-crypto.ehpk --title "$TAG" --notes "Release $TAG" --target "$GITHUB_SHA"
+          fi
