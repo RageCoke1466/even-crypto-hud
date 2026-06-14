@@ -13,7 +13,7 @@ Shows live crypto prices on Even glasses.
 ## Requirements
 
 - Node.js 20+
-- pnpm 11+
+- pnpm 10+
 - Even Realities App with Even Hub / Developer Center access
 - Even G2 paired to the phone for hardware testing
 - CoinGecko Demo API key
