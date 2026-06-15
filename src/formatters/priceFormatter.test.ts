@@ -50,7 +50,7 @@ describe('formatHudSnapshot', () => {
 
     expect(formatted).toEqual({
       timestamp: `LAST UPDATED ${localTime}`,
-      rows: ['BTC   $67,412.4', 'ETH   $3,540.1', 'SOL    $172.4', 'XRP      $2.4'],
+      rows: ['BTC   $67,412.42', 'ETH   $3,540.12', 'SOL   $172.40', 'XRP     $2.41'],
     });
     expect([formatted.timestamp, ...formatted.rows].join(' ')).not.toContain('24h');
   });

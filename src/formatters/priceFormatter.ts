@@ -29,8 +29,8 @@ export function formatLoadingHud(coins: WatchlistCoin[]): HudText {
 
 function formatUsd(value: number): string {
   const isSubDollar = value < 1;
-  const minimumFractionDigits = isSubDollar ? 4 : 1;
-  const maximumFractionDigits = isSubDollar ? 8 : 1;
+  const minimumFractionDigits = isSubDollar ? 4 : 2;
+  const maximumFractionDigits = isSubDollar ? 8 : 2;
 
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
