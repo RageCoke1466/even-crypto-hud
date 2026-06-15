@@ -35,7 +35,7 @@ describe('CoinGeckoPriceSource', () => {
     const snapshot = await source.getPrices(watchlist);
 
     expect(fetchFn).toHaveBeenCalledWith(
-      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin%2Cethereum%2Csolana%2Cripple&vs_currencies=usd',
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin%2Cethereum%2Csolana%2Cripple&vs_currencies=usd&precision=full',
       {
         headers: {
           accept: 'application/json',
