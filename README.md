@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo/crypto-hud-logo.png" alt="Crypto HUD logo" width="128">
+</p>
+
 # Even Crypto HUD
 
 A small TypeScript Even Hub app for showing a crypto watchlist on Even G2 glasses.
