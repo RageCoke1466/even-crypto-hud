@@ -94,7 +94,7 @@ describe('app state helpers', () => {
       message: 'BTC, ETH, SOL, XRP updated from CoinGecko.',
       hudText: {
         timestamp: `LAST UPDATED ${localTime}`,
-        rows: ['BTC   $67,412', 'ETH    $3,540', 'SOL      $172', 'XRP     $2.41'],
+        rows: ['BTC   $67,412.4', 'ETH   $3,540.1', 'SOL    $172.4', 'XRP      $2.4'],
       },
       shouldFetch: true,
     });
