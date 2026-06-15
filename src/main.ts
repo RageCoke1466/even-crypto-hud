@@ -88,11 +88,6 @@ function bindEvents(): void {
     void syncGlasses(buildMissingKeyState().hudText);
   });
 
-  elements.refreshButton.addEventListener('click', () => {
-    void loadCoinCatalogInBackground();
-    void refreshPrice();
-  });
-
   elements.refreshWatchlistButton.addEventListener('click', () => {
     void refreshWatchlistFromBridgeStorage();
   });
@@ -425,7 +420,6 @@ function renderState(state: CryptoAppState): void {
   elements.statusValue.textContent = state.status;
   elements.statusValue.dataset.status = state.status;
   elements.message.textContent = state.message;
-  elements.refreshButton.disabled = !state.shouldFetch;
   renderPreview(state.hudText);
 }
 
@@ -529,8 +523,7 @@ function renderShell(container: HTMLElement) {
   container.innerHTML = `
     <section class="workspace">
       <div class="panel">
-        <p class="eyebrow">Even G2 Crypto HUD</p>
-        <h1>Crypto watchlist, one glance.</h1>
+        <p class="eyebrow">Crypto Hub</p>
 
         <form class="key-form">
           <label for="coingecko-key">CoinGecko Demo API key</label>
@@ -548,7 +541,6 @@ function renderShell(container: HTMLElement) {
           </div>
           <div class="actions">
             <button type="submit">Save key</button>
-            <button type="button" data-action="refresh">Refresh now</button>
             <button type="button" data-action="clear">Clear</button>
           </div>
         </form>
@@ -593,7 +585,6 @@ function renderShell(container: HTMLElement) {
   const coinSearchInput = container.querySelector<HTMLInputElement>('#coin-search');
   const form = container.querySelector<HTMLFormElement>('.key-form');
   const clearButton = container.querySelector<HTMLButtonElement>('[data-action="clear"]');
-  const refreshButton = container.querySelector<HTMLButtonElement>('[data-action="refresh"]');
   const refreshWatchlistButton = container.querySelector<HTMLButtonElement>('[data-action="refresh-watchlist"]');
   const resultsList = container.querySelector<HTMLElement>('[data-role="coin-results"]');
   const watchlistList = container.querySelector<HTMLElement>('[data-role="watchlist-list"]');
@@ -609,7 +600,6 @@ function renderShell(container: HTMLElement) {
     !coinSearchInput ||
     !form ||
     !clearButton ||
-    !refreshButton ||
     !refreshWatchlistButton ||
     !resultsList ||
     !watchlistList ||
@@ -633,7 +623,6 @@ function renderShell(container: HTMLElement) {
     coinSearchInput,
     form,
     clearButton,
-    refreshButton,
     refreshWatchlistButton,
     resultsList,
     watchlistList,
