@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo/crypto-hud-logo.png" alt="Crypto HUD logo" width="128">
+</p>
+
 # Even Crypto HUD
 
 A small TypeScript Even Hub app for showing a crypto watchlist on Even G2 glasses.
@@ -5,6 +9,12 @@ A small TypeScript Even Hub app for showing a crypto watchlist on Even G2 glasse
 The app uses CoinGecko as a read-only price provider, lets the user enter a CoinGecko Demo API key, and renders the first four watchlist coins in a pixel-style HUD card.
 
 It does not trade, place orders, or connect to wallets.
+
+## Screenshots
+
+| Phone app | Glasses HUD |
+| --- | --- |
+| <img src="assets/screenshots/v0.1.10/inapp.png" alt="Crypto Hub phone app screen" width="320"> | <img src="assets/screenshots/v0.1.10/glasses.png" alt="Crypto Hub glasses HUD screen" width="420"> |
 
 ## What It Does
 
