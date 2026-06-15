@@ -104,14 +104,20 @@ describe('phone UI shell', () => {
   it('renders coin search controls, an empty watchlist, and the four-row glasses preview', async () => {
     await import('./main');
 
+    const appTitle = document.querySelector<HTMLElement>('.eyebrow');
     const coinSearchInput = document.querySelector<HTMLInputElement>('#coin-search');
     const refreshWatchlistButton = document.querySelector<HTMLButtonElement>('[data-action="refresh-watchlist"]');
+    const refreshNowButton = document.querySelector<HTMLButtonElement>('[data-action="refresh"]');
     const watchlistInput = document.querySelector<HTMLInputElement>('#watchlist-symbols');
     const chips = Array.from(document.querySelectorAll<HTMLElement>('[data-role="watchlist-chip"]'));
     const previewRows = Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-row"]'));
 
+    expect(appTitle?.textContent).toBe('Crypto Hub');
+    expect(document.body.textContent).not.toContain('Even G2 Crypto HUD');
+    expect(document.body.textContent).not.toContain('Crypto watchlist, one glance.');
     expect(coinSearchInput?.placeholder).toBe('Search by symbol, name, or id');
     expect(refreshWatchlistButton?.textContent).toBe('Refresh watchlist');
+    expect(refreshNowButton).toBeNull();
     expect(watchlistInput).toBeNull();
     expect(chips.map((chip) => chip.dataset.coinId)).toEqual([]);
     expect(document.querySelector('[data-role="preview-timestamp"]')?.textContent).toBe('');
