@@ -6,6 +6,12 @@ The app uses CoinGecko as a read-only price provider, lets the user enter a Coin
 
 It does not trade, place orders, or connect to wallets.
 
+## Screenshots
+
+| Phone app | Glasses HUD |
+| --- | --- |
+| <img src="assets/screenshots/v0.1.10/inapp.png" alt="Crypto Hub phone app screen" width="320"> | <img src="assets/screenshots/v0.1.10/glasses.png" alt="Crypto Hub glasses HUD screen" width="420"> |
+
 ## What It Does
 
 Shows live crypto prices on Even glasses.
