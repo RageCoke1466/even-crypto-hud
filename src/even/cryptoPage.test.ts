@@ -67,6 +67,18 @@ describe('buildCryptoHudPage', () => {
     });
     expect(page.textObject?.map((container) => container.content).join(' ')).not.toContain('24h');
   });
+
+  it('uses the root card as the only event capture container', () => {
+    const page = buildCryptoHudPage(hudText);
+    const eventCaptureContainers = page.textObject?.filter((container) => container.isEventCapture === 1);
+
+    expect(eventCaptureContainers?.map((container) => container.containerName)).toEqual(['card']);
+    expect(
+      page.textObject
+        ?.filter((container) => container.containerName !== 'card')
+        .every((container) => container.isEventCapture === 0),
+    ).toBe(true);
+  });
 });
 
 describe('buildCryptoHudUpdates', () => {
