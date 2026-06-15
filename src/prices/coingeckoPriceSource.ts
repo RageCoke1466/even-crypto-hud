@@ -30,6 +30,7 @@ export class CoinGeckoPriceSource implements PriceProvider {
     const params = new URLSearchParams({
       ids: ids.join(','),
       vs_currencies: 'usd',
+      precision: 'full',
     });
 
     const response = await this.fetchFn(`${SIMPLE_PRICE_URL}?${params.toString()}`, {
