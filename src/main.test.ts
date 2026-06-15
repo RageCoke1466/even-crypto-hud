@@ -3,11 +3,14 @@ import type { WatchlistCoin } from './settings/watchlistStore';
 
 const bridgeState = vi.hoisted(() => ({
   hasBridge: false,
+  evenHubCallbacks: [] as Array<(event: { textEvent?: { eventType?: number }; sysEvent?: { eventType?: number } }) => void>,
   bridge: {
     getLocalStorage: vi.fn(),
     setLocalStorage: vi.fn(),
     createStartUpPageContainer: vi.fn(),
     textContainerUpgrade: vi.fn(),
+    shutDownPageContainer: vi.fn(),
+    onEvenHubEvent: vi.fn(),
   },
 }));
 
@@ -84,6 +87,14 @@ describe('phone UI shell', () => {
     bridgeState.bridge.createStartUpPageContainer.mockResolvedValue(0);
     bridgeState.bridge.textContainerUpgrade.mockReset();
     bridgeState.bridge.textContainerUpgrade.mockResolvedValue(true);
+    bridgeState.bridge.shutDownPageContainer.mockReset();
+    bridgeState.bridge.shutDownPageContainer.mockResolvedValue(true);
+    bridgeState.evenHubCallbacks = [];
+    bridgeState.bridge.onEvenHubEvent.mockReset();
+    bridgeState.bridge.onEvenHubEvent.mockImplementation((callback) => {
+      bridgeState.evenHubCallbacks.push(callback);
+      return () => undefined;
+    });
     priceState.requestedApiKeys = [];
     priceState.requestedCoinIds = [];
     priceState.nextError = null;
@@ -115,6 +126,8 @@ describe('phone UI shell', () => {
     expect(appTitle?.textContent).toBe('Crypto Hub');
     expect(document.body.textContent).not.toContain('Even G2 Crypto HUD');
     expect(document.body.textContent).not.toContain('Crypto watchlist, one glance.');
+    expect(document.querySelector('a[href="https://docs.coingecko.com/docs/setting-up-your-api-key"]')).toBeNull();
+    expect(document.querySelector('a[href="https://www.coingecko.com/en/api"]')).toBeNull();
     expect(coinSearchInput?.placeholder).toBe('Search by symbol, name, or id');
     expect(refreshWatchlistButton?.textContent).toBe('Refresh watchlist');
     expect(refreshNowButton).toBeNull();
@@ -239,5 +252,21 @@ describe('phone UI shell', () => {
       }),
     );
     expect(document.querySelector('[data-role="message"]')?.textContent).toBe('CoinGecko rate limit reached');
+  });
+
+  it('registers EvenHub events and opens the system exit dialog on root double-tap', async () => {
+    bridgeState.hasBridge = true;
+    bridgeState.bridge.getLocalStorage.mockResolvedValue('');
+
+    await import('./main');
+    await flushAsyncWork();
+
+    expect(bridgeState.bridge.onEvenHubEvent).toHaveBeenCalledTimes(1);
+    expect(bridgeState.evenHubCallbacks).toHaveLength(1);
+
+    await bridgeState.evenHubCallbacks[0]({ textEvent: { eventType: 3 } });
+    await flushAsyncWork();
+
+    expect(bridgeState.bridge.shutDownPageContainer).toHaveBeenCalledWith(1);
   });
 });

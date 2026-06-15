@@ -1,4 +1,5 @@
 import './styles.css';
+import { OsEventTypeList, type EvenHubEvent } from '@evenrealities/even_hub_sdk';
 import {
   buildEmptyWatchlistState,
   buildErrorState,
@@ -46,7 +47,9 @@ const coinCatalogStore = createBrowserCoinCatalogStore();
 const elements = renderShell(root);
 
 let evenBridge: Awaited<ReturnType<typeof connectEvenBridge>> | null = null;
+let unsubscribeEvenHubEvents: (() => void) | null = null;
 let glassesPageCreated = false;
+let glassesPageShuttingDown = false;
 let currentHudText: HudText = buildMissingKeyState().hudText;
 let coinCatalog: CoinCatalogEntry[] = coinCatalogStore.loadFresh(new Date()) ?? coinCatalogStore.loadAny() ?? [
   ...DEFAULT_WATCHLIST,
@@ -162,6 +165,7 @@ async function connectBridgeInBackground(): Promise<void> {
     evenBridge = await connectEvenBridge();
     updateBridgeStatus('Even bridge connected.');
     logInfo('Even bridge connected');
+    bindEvenHubEvents(evenBridge);
     const restoredWatchlist = await restoreWatchlistFromBridgeStorage();
     const restoredApiKey = await restoreApiKeyFromBridgeStorage();
 
@@ -175,6 +179,50 @@ async function connectBridgeInBackground(): Promise<void> {
     }
   } catch (error) {
     updateBridgeStatus(`Even bridge error: ${messageFrom(error)}`);
+  }
+}
+
+function bindEvenHubEvents(bridge: Awaited<ReturnType<typeof connectEvenBridge>>): void {
+  if (unsubscribeEvenHubEvents) {
+    return;
+  }
+
+  unsubscribeEvenHubEvents = bridge.onEvenHubEvent((event) => {
+    if (!isDoubleTapEvent(event)) {
+      return;
+    }
+
+    void shutDownGlassesPage();
+  });
+}
+
+function isDoubleTapEvent(event: EvenHubEvent): boolean {
+  return [event.textEvent?.eventType, event.listEvent?.eventType, event.sysEvent?.eventType].includes(
+    OsEventTypeList.DOUBLE_CLICK_EVENT,
+  );
+}
+
+async function shutDownGlassesPage(): Promise<void> {
+  if (!evenBridge || glassesPageShuttingDown) {
+    return;
+  }
+
+  glassesPageShuttingDown = true;
+
+  try {
+    const shutDown = await evenBridge.shutDownPageContainer(1);
+
+    if (shutDown) {
+      updateBridgeStatus('Glasses HUD exit requested.');
+      return;
+    }
+
+    updateBridgeStatus('Glasses HUD exit was not accepted.');
+  } catch (error) {
+    updateBridgeStatus(`Glasses HUD exit failed: ${messageFrom(error)}`);
+    logError('Glasses HUD exit failed', error);
+  } finally {
+    glassesPageShuttingDown = false;
   }
 }
 
@@ -546,9 +594,9 @@ function renderShell(container: HTMLElement) {
         </form>
 
         <div class="help">
-          <a href="https://docs.coingecko.com/docs/setting-up-your-api-key" target="_blank" rel="noreferrer">Get a CoinGecko API key</a>
+          <span>CoinGecko Demo API key required</span>
           <span>Default refresh: 5 minutes</span>
-          <a href="https://www.coingecko.com/en/api" target="_blank" rel="noreferrer">Data provided by CoinGecko</a>
+          <span>Data provided by CoinGecko</span>
         </div>
 
         <dl class="status-grid">

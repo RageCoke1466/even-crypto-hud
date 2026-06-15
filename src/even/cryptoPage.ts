@@ -33,7 +33,7 @@ export function buildCryptoHudPage(text: HudText): CreateStartUpPageContainer {
         containerID: CONTAINERS.card.id,
         containerName: CONTAINERS.card.name,
         content: '',
-        isEventCapture: 0,
+        isEventCapture: 1,
       }),
       new TextContainerProperty({
         xPosition: 314,
