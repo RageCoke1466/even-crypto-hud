@@ -50,9 +50,48 @@ describe('formatHudSnapshot', () => {
 
     expect(formatted).toEqual({
       timestamp: `LAST UPDATED ${localTime}`,
-      rows: ['BTC   $67,412', 'ETH    $3,540', 'SOL      $172', 'XRP     $2.41'],
+      rows: ['BTC   $67,412.42', 'ETH   $3,540.12', 'SOL   $172.40', 'XRP     $2.41'],
     });
     expect([formatted.timestamp, ...formatted.rows].join(' ')).not.toContain('24h');
+  });
+
+  it('formats sub-dollar prices with at least four and at most eight decimals', () => {
+    const updatedAt = new Date('2026-06-07T21:32:00.000Z');
+    const snapshot: CryptoWatchlistSnapshot = {
+      quoteSymbol: 'USD',
+      assets: [
+        {
+          coin: { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin' },
+          quoteSymbol: 'USD',
+          price: 0.123456789,
+          updatedAt,
+          provider: 'coingecko',
+        },
+        {
+          coin: { id: 'cardano', symbol: 'ADA', name: 'Cardano' },
+          quoteSymbol: 'USD',
+          price: 0.5,
+          updatedAt,
+          provider: 'coingecko',
+        },
+        {
+          coin: { id: 'shiba-inu', symbol: 'SHIB', name: 'Shiba Inu' },
+          quoteSymbol: 'USD',
+          price: 0.000012345678,
+          updatedAt,
+          provider: 'coingecko',
+        },
+      ],
+      updatedAt,
+      provider: 'coingecko',
+    };
+
+    expect(formatHudSnapshot(snapshot).rows).toEqual([
+      'DOGE  $0.12345679',
+      'ADA   $0.5000',
+      'SHIB  $0.00001235',
+      '',
+    ]);
   });
 });
 
