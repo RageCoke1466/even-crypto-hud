@@ -13,11 +13,11 @@ const CONTAINERS = {
   row2: { id: 4, name: 'row2' },
   row3: { id: 5, name: 'row3' },
   row4: { id: 6, name: 'row4' },
-  sentimentGauge: { id: 7, name: 'sentimentGauge' },
+  activityGauge: { id: 7, name: 'activityGauge' },
 } as const;
 const TIMESTAMP_UPDATE_LENGTH = 18;
 const ROW_UPDATE_LENGTH = 32;
-const SENTIMENT_GAUGE_UPDATE_LENGTH = 24;
+const ACTIVITY_GAUGE_UPDATE_LENGTH = 24;
 
 export function buildCryptoHudPage(text: HudText): CreateStartUpPageContainer {
   return new CreateStartUpPageContainer({
@@ -64,9 +64,9 @@ export function buildCryptoHudPage(text: HudText): CreateStartUpPageContainer {
         borderColor: 0,
         borderRadius: 0,
         paddingLength: 0,
-        containerID: CONTAINERS.sentimentGauge.id,
-        containerName: CONTAINERS.sentimentGauge.name,
-        content: text.sentimentGauge,
+        containerID: CONTAINERS.activityGauge.id,
+        containerName: CONTAINERS.activityGauge.name,
+        content: text.activityGauge,
         isEventCapture: 0,
       }),
     ],
@@ -81,10 +81,10 @@ export function buildCryptoHudUpdates(text: HudText): TextContainerUpgrade[] {
     buildTextUpdate(CONTAINERS.row3.id, CONTAINERS.row3.name, text.rows[2], ROW_UPDATE_LENGTH),
     buildTextUpdate(CONTAINERS.row4.id, CONTAINERS.row4.name, text.rows[3], ROW_UPDATE_LENGTH),
     buildTextUpdate(
-      CONTAINERS.sentimentGauge.id,
-      CONTAINERS.sentimentGauge.name,
-      text.sentimentGauge,
-      SENTIMENT_GAUGE_UPDATE_LENGTH,
+      CONTAINERS.activityGauge.id,
+      CONTAINERS.activityGauge.name,
+      text.activityGauge,
+      ACTIVITY_GAUGE_UPDATE_LENGTH,
     ),
   ];
 }

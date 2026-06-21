@@ -1,7 +1,8 @@
-export interface MarketGaugeSnapshot {
+export interface MarketActivitySnapshot {
   score: number;
-  marketCapChangePercentage24hUsd: number;
-  volumeChangePercentage24hUsd?: number;
+  volumeActivityScore: number;
+  volatilityActivityScore: number;
+  trendingActivityScore: number;
   updatedAt: Date;
   provider: 'coingecko';
 }

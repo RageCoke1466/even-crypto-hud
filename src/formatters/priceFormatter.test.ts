@@ -39,10 +39,11 @@ describe('formatHudSnapshot', () => {
       ],
       updatedAt,
       provider: 'coingecko',
-      marketGauge: {
-        score: 72,
-        marketCapChangePercentage24hUsd: 2.2,
-        volumeChangePercentage24hUsd: 12.5,
+      marketActivity: {
+        score: 50,
+        volumeActivityScore: 40,
+        volatilityActivityScore: 60,
+        trendingActivityScore: 50,
         updatedAt,
         provider: 'coingecko',
       },
@@ -58,9 +59,9 @@ describe('formatHudSnapshot', () => {
     expect(formatted).toEqual({
       timestamp: `LAST UPDATED ${localTime}`,
       rows: ['BTC   $67,412.42', 'ETH   $3,540.12', 'SOL   $172.40', 'XRP     $2.41'],
-      sentimentGauge: 'DOWN \\----^--/ UP',
+      activityGauge: 'QUIET \\---^---/ ACTIVE',
     });
-    expect(formatted).not.toHaveProperty('sentimentScore');
+    expect(formatted).not.toHaveProperty('activityScore');
     expect([formatted.timestamp, ...formatted.rows].join(' ')).not.toContain('24h');
   });
 
@@ -97,11 +98,11 @@ describe('formatHudSnapshot', () => {
 
     expect(formatHudSnapshot(snapshot)).toMatchObject({
       rows: ['DOGE  $0.12345679', 'ADA   $0.5000', 'SHIB  $0.00001235', ''],
-      sentimentGauge: '',
+      activityGauge: '',
     });
   });
 
-  it('uses the gauge only for strong positive market moves', () => {
+  it('maps high activity scores toward ACTIVE', () => {
     const updatedAt = new Date('2026-06-07T21:32:00.000Z');
     const snapshot: CryptoWatchlistSnapshot = {
       quoteSymbol: 'USD',
@@ -116,9 +117,11 @@ describe('formatHudSnapshot', () => {
       ],
       updatedAt,
       provider: 'coingecko',
-      marketGauge: {
+      marketActivity: {
         score: 88,
-        marketCapChangePercentage24hUsd: 3.8,
+        volumeActivityScore: 90,
+        volatilityActivityScore: 85,
+        trendingActivityScore: 88,
         updatedAt,
         provider: 'coingecko',
       },
@@ -127,9 +130,9 @@ describe('formatHudSnapshot', () => {
     const formatted = formatHudSnapshot(snapshot);
 
     expect(formatted).toMatchObject({
-      sentimentGauge: 'DOWN \\-----^-/ UP',
+      activityGauge: 'QUIET \\-----^-/ ACTIVE',
     });
-    expect(formatted).not.toHaveProperty('sentimentScore');
+    expect(formatted).not.toHaveProperty('activityScore');
   });
 });
 
@@ -138,7 +141,7 @@ describe('formatKeyRequiredHud', () => {
     expect(formatKeyRequiredHud()).toEqual({
       timestamp: '',
       rows: ['KEY REQUIRED', 'OPEN PHONE', '', ''],
-      sentimentGauge: '',
+      activityGauge: '',
     });
   });
 });
@@ -153,7 +156,7 @@ describe('formatLoadingHud', () => {
     ).toEqual({
       timestamp: '',
       rows: ['BTC   LOADING', 'ETH   LOADING', '', ''],
-      sentimentGauge: '',
+      activityGauge: '',
     });
   });
 });

@@ -9,7 +9,7 @@
   "permissions": [
     {
       "name": "network",
-      "desc": "Fetches read-only watchlist price and global market data from CoinGecko.",
+      "desc": "Fetches read-only watchlist price and market activity data from CoinGecko.",
       "whitelist": ["https://api.coingecko.com"]
     }
   ],

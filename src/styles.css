@@ -275,7 +275,7 @@ h1 {
   white-space: pre;
 }
 
-.hud-sentiment {
+.hud-activity {
   position: absolute;
   right: clamp(16px, 4vw, 28px);
   bottom: clamp(12px, 3vw, 24px);
@@ -288,7 +288,7 @@ h1 {
   white-space: pre;
 }
 
-.hud-sentiment-gauge {
+.hud-activity-gauge {
   color: #6ed87c;
 }
 

@@ -17,7 +17,7 @@ describe('app state helpers', () => {
       hudText: {
         timestamp: '',
         rows: ['KEY REQUIRED', 'OPEN PHONE', '', ''],
-        sentimentGauge: '',
+        activityGauge: '',
       },
       shouldFetch: false,
     });
@@ -30,7 +30,7 @@ describe('app state helpers', () => {
       hudText: {
         timestamp: '',
         rows: ['BTC   LOADING', 'ETH   LOADING', '', ''],
-        sentimentGauge: '',
+        activityGauge: '',
       },
       shouldFetch: true,
     });
@@ -43,7 +43,7 @@ describe('app state helpers', () => {
       hudText: {
         timestamp: '',
         rows: ['', '', '', ''],
-        sentimentGauge: '',
+        activityGauge: '',
       },
       shouldFetch: false,
     });
@@ -90,9 +90,11 @@ describe('app state helpers', () => {
       ],
       updatedAt,
       provider: 'coingecko',
-      marketGauge: {
+      marketActivity: {
         score: 22,
-        marketCapChangePercentage24hUsd: -2.8,
+        volumeActivityScore: 20,
+        volatilityActivityScore: 26,
+        trendingActivityScore: 18,
         updatedAt,
         provider: 'coingecko',
       },
@@ -104,7 +106,7 @@ describe('app state helpers', () => {
       hudText: {
         timestamp: `LAST UPDATED ${localTime}`,
         rows: ['BTC   $67,412.42', 'ETH   $3,540.12', 'SOL   $172.40', 'XRP     $2.41'],
-        sentimentGauge: 'DOWN \\-^-----/ UP',
+        activityGauge: 'QUIET \\-^-----/ ACTIVE',
       },
       shouldFetch: true,
     });
