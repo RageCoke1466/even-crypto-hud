@@ -85,8 +85,7 @@ h1 {
   gap: 10px;
 }
 
-.key-form label,
-.status-grid dt {
+.key-form label {
   color: #aabdaf;
   font-size: 13px;
 }
@@ -178,37 +177,6 @@ h1 {
   gap: 6px;
   color: #8ca394;
   font-size: 13px;
-}
-
-.status-grid {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-}
-
-.status-grid div {
-  display: grid;
-  grid-template-columns: 82px 1fr;
-  gap: 10px;
-}
-
-.status-grid dd,
-.status-grid dt {
-  margin: 0;
-}
-
-.status-grid dd {
-  color: #e7eee8;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  overflow-wrap: anywhere;
-}
-
-.status-grid dd[data-status="ready"] {
-  color: #9df2ad;
-}
-
-.status-grid dd[data-status="error"] {
-  color: #ffad99;
 }
 
 .message {

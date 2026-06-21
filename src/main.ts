@@ -535,8 +535,6 @@ async function syncGlasses(hudText: HudText): Promise<void> {
 }
 
 function renderState(state: CryptoAppState): void {
-  elements.statusValue.textContent = state.status;
-  elements.statusValue.dataset.status = state.status;
   elements.message.textContent = state.message;
   renderPreview(state.hudText);
 }
@@ -554,7 +552,9 @@ function renderPreview(hudText: HudText): void {
 }
 
 function updateBridgeStatus(message: string): void {
-  elements.bridgeStatus.textContent = message;
+  if (elements.bridgeStatus) {
+    elements.bridgeStatus.textContent = message;
+  }
 }
 
 function areWatchlistsEqual(first: WatchlistCoin[], second: WatchlistCoin[]): boolean {
@@ -683,42 +683,31 @@ function renderShell(container: HTMLElement) {
         <p class="eyebrow">Crypto Hub</p>
 
         <form class="key-form">
-          <label for="coingecko-key">CoinGecko Demo API key</label>
-          <input id="coingecko-key" name="coingecko-key" type="password" autocomplete="off" placeholder="Paste your CoinGecko key" />
+          <div class="actions">
+            <label for="coingecko-key">CoinGecko API key</label>
+            <input id="coingecko-key" name="coingecko-key" type="password" autocomplete="off" placeholder="Paste your CoinGecko key" />
+            <button type="submit">Save key</button>
+            <div class="help">
+              <span>CoinGecko API key required</span>
+              <span>Default refresh: 5 minutes</span>
+              <span>Market activity by CoinGecko</span>
+            </div>
+          </div>
           <label for="coin-search">Add coin</label>
           <input id="coin-search" name="coin-search" type="text" autocomplete="off" placeholder="Search by symbol, name, or id" />
           <ul class="coin-results" data-role="coin-results"></ul>
           <div class="watchlist-editor">
             <div class="watchlist-title">
               <span>Watchlist</span>
-              <button type="button" data-action="refresh-watchlist">Refresh watchlist</button>
+              <div class="watchlist-actions">
+                <button type="button" data-action="refresh-watchlist">Refresh watchlist</button>
+                <button type="button" data-action="clear">Clear</button>
+              </div>
             </div>
             <ul class="watchlist-list" data-role="watchlist-list"></ul>
             <p class="first-four-note" data-role="first-four-note" hidden>Swipe up/down on glasses to page through four coins at a time.</p>
           </div>
-          <div class="actions">
-            <button type="submit">Save key</button>
-            <button type="button" data-action="clear">Clear</button>
-          </div>
         </form>
-
-        <div class="help">
-          <span>CoinGecko Demo API key required</span>
-          <span>Default refresh: 5 minutes</span>
-          <span>Market activity by CoinGecko</span>
-        </div>
-
-        <dl class="status-grid">
-          <div>
-            <dt>Provider</dt>
-            <dd data-role="status">missing-key</dd>
-          </div>
-          <div>
-            <dt>Bridge</dt>
-            <dd data-role="bridge">Waiting for Even bridge...</dd>
-          </div>
-        </dl>
-
         <p class="message" data-role="message"></p>
       </div>
 
@@ -758,7 +747,6 @@ function renderShell(container: HTMLElement) {
   const resultsList = container.querySelector<HTMLElement>('[data-role="coin-results"]');
   const watchlistList = container.querySelector<HTMLElement>('[data-role="watchlist-list"]');
   const firstFourNote = container.querySelector<HTMLElement>('[data-role="first-four-note"]');
-  const statusValue = container.querySelector<HTMLElement>('[data-role="status"]');
   const bridgeStatus = container.querySelector<HTMLElement>('[data-role="bridge"]');
   const message = container.querySelector<HTMLElement>('[data-role="message"]');
   const previewTimestamp = container.querySelector<HTMLElement>('[data-role="preview-timestamp"]');
@@ -774,8 +762,6 @@ function renderShell(container: HTMLElement) {
     !resultsList ||
     !watchlistList ||
     !firstFourNote ||
-    !statusValue ||
-    !bridgeStatus ||
     !message ||
     !previewTimestamp ||
     previewRows.length !== 4 ||
@@ -798,7 +784,6 @@ function renderShell(container: HTMLElement) {
     resultsList,
     watchlistList,
     firstFourNote,
-    statusValue,
     bridgeStatus,
     message,
     previewTimestamp,
