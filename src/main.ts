@@ -13,6 +13,8 @@ import { createCryptoHudPage, updateCryptoHudPage } from './even/cryptoPage';
 import type { HudText } from './formatters/priceFormatter';
 import { CoinGeckoCoinCatalogSource } from './prices/coinCatalogSource';
 import { CoinGeckoPriceSource } from './prices/coingeckoPriceSource';
+import { CoinGeckoGlobalMarketSource } from './market/coinGeckoGlobalMarketSource';
+import type { MarketGaugeSnapshot } from './market/types';
 import {
   clearApiKeyFromBridgeStorage,
   createBrowserApiKeyStore,
@@ -51,6 +53,7 @@ let unsubscribeEvenHubEvents: (() => void) | null = null;
 let glassesPageCreated = false;
 let glassesPageShuttingDown = false;
 let currentHudText: HudText = buildMissingKeyState().hudText;
+let currentMarketGauge: MarketGaugeSnapshot | undefined;
 let coinCatalog: CoinCatalogEntry[] = coinCatalogStore.loadFresh(new Date()) ?? coinCatalogStore.loadAny() ?? [
   ...DEFAULT_WATCHLIST,
 ];
@@ -433,8 +436,11 @@ async function refreshPrice(options: { syncLoadingToGlasses?: boolean } = {}): P
   }
 
   try {
-    const snapshot = await new CoinGeckoPriceSource({ apiKey }).getPrices(visibleWatchlist);
-    const state = buildSnapshotState(snapshot);
+    const [snapshot, marketGauge] = await Promise.all([
+      new CoinGeckoPriceSource({ apiKey }).getPrices(visibleWatchlist),
+      refreshMarketGauge(apiKey),
+    ]);
+    const state = buildSnapshotState({ ...snapshot, marketGauge });
     renderState(state);
     await syncGlasses(state.hudText);
   } catch (error) {
@@ -442,6 +448,16 @@ async function refreshPrice(options: { syncLoadingToGlasses?: boolean } = {}): P
     renderState(state);
     await syncGlasses(state.hudText);
   }
+}
+
+async function refreshMarketGauge(apiKey: string): Promise<MarketGaugeSnapshot | undefined> {
+  try {
+    currentMarketGauge = await new CoinGeckoGlobalMarketSource({ apiKey }).getLatest();
+  } catch (error) {
+    logWarn(`Global market data unavailable: ${messageFrom(error)}`);
+  }
+
+  return currentMarketGauge;
 }
 
 async function syncGlasses(hudText: HudText): Promise<void> {
@@ -476,6 +492,7 @@ function renderPreview(hudText: HudText): void {
   elements.previewRows.forEach((row, index) => {
     row.textContent = hudText.rows[index];
   });
+  elements.previewSentimentGauge.textContent = hudText.sentimentGauge;
 }
 
 function updateBridgeStatus(message: string): void {
@@ -596,7 +613,7 @@ function renderShell(container: HTMLElement) {
         <div class="help">
           <span>CoinGecko Demo API key required</span>
           <span>Default refresh: 5 minutes</span>
-          <span>Data provided by CoinGecko</span>
+          <span>Market data by CoinGecko</span>
         </div>
 
         <dl class="status-grid">
@@ -623,6 +640,9 @@ function renderShell(container: HTMLElement) {
               <div class="hud-row" data-role="preview-row"></div>
               <div class="hud-row" data-role="preview-row"></div>
             </div>
+            <div class="hud-sentiment" aria-label="Market sentiment preview">
+              <div class="hud-sentiment-gauge" data-role="preview-sentiment-gauge"></div>
+            </div>
           </div>
         </div>
       </section>
@@ -642,6 +662,7 @@ function renderShell(container: HTMLElement) {
   const message = container.querySelector<HTMLElement>('[data-role="message"]');
   const previewTimestamp = container.querySelector<HTMLElement>('[data-role="preview-timestamp"]');
   const previewRows = Array.from(container.querySelectorAll<HTMLElement>('[data-role="preview-row"]'));
+  const previewSentimentGauge = container.querySelector<HTMLElement>('[data-role="preview-sentiment-gauge"]');
 
   if (
     !apiKeyInput ||
@@ -656,6 +677,7 @@ function renderShell(container: HTMLElement) {
     !bridgeStatus ||
     !message ||
     !previewTimestamp ||
+    !previewSentimentGauge ||
     previewRows.length !== 4
   ) {
     throw new Error('Failed to render app shell');
@@ -680,5 +702,6 @@ function renderShell(container: HTMLElement) {
     message,
     previewTimestamp,
     previewRows,
+    previewSentimentGauge,
   };
 }

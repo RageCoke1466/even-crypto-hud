@@ -275,6 +275,23 @@ h1 {
   white-space: pre;
 }
 
+.hud-sentiment {
+  position: absolute;
+  right: clamp(16px, 4vw, 28px);
+  bottom: clamp(12px, 3vw, 24px);
+  display: grid;
+  gap: clamp(3px, 0.75vw, 6px);
+  color: #b8ffc7;
+  font-size: clamp(10px, 2vw, 17px);
+  line-height: 1;
+  text-align: left;
+  white-space: pre;
+}
+
+.hud-sentiment-gauge {
+  color: #6ed87c;
+}
+
 @media (max-width: 980px) {
   .workspace {
     grid-template-columns: 1fr;

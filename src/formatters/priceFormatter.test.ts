@@ -39,6 +39,13 @@ describe('formatHudSnapshot', () => {
       ],
       updatedAt,
       provider: 'coingecko',
+      marketGauge: {
+        score: 72,
+        marketCapChangePercentage24hUsd: 2.2,
+        volumeChangePercentage24hUsd: 12.5,
+        updatedAt,
+        provider: 'coingecko',
+      },
     };
     const localTime = new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',
@@ -51,7 +58,9 @@ describe('formatHudSnapshot', () => {
     expect(formatted).toEqual({
       timestamp: `LAST UPDATED ${localTime}`,
       rows: ['BTC   $67,412.42', 'ETH   $3,540.12', 'SOL   $172.40', 'XRP     $2.41'],
+      sentimentGauge: 'DOWN \\----^--/ UP',
     });
+    expect(formatted).not.toHaveProperty('sentimentScore');
     expect([formatted.timestamp, ...formatted.rows].join(' ')).not.toContain('24h');
   });
 
@@ -86,12 +95,41 @@ describe('formatHudSnapshot', () => {
       provider: 'coingecko',
     };
 
-    expect(formatHudSnapshot(snapshot).rows).toEqual([
-      'DOGE  $0.12345679',
-      'ADA   $0.5000',
-      'SHIB  $0.00001235',
-      '',
-    ]);
+    expect(formatHudSnapshot(snapshot)).toMatchObject({
+      rows: ['DOGE  $0.12345679', 'ADA   $0.5000', 'SHIB  $0.00001235', ''],
+      sentimentGauge: '',
+    });
+  });
+
+  it('uses the gauge only for strong positive market moves', () => {
+    const updatedAt = new Date('2026-06-07T21:32:00.000Z');
+    const snapshot: CryptoWatchlistSnapshot = {
+      quoteSymbol: 'USD',
+      assets: [
+        {
+          coin: { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+          quoteSymbol: 'USD',
+          price: 67412.42,
+          updatedAt,
+          provider: 'coingecko',
+        },
+      ],
+      updatedAt,
+      provider: 'coingecko',
+      marketGauge: {
+        score: 88,
+        marketCapChangePercentage24hUsd: 3.8,
+        updatedAt,
+        provider: 'coingecko',
+      },
+    };
+
+    const formatted = formatHudSnapshot(snapshot);
+
+    expect(formatted).toMatchObject({
+      sentimentGauge: 'DOWN \\-----^-/ UP',
+    });
+    expect(formatted).not.toHaveProperty('sentimentScore');
   });
 });
 
@@ -100,6 +138,7 @@ describe('formatKeyRequiredHud', () => {
     expect(formatKeyRequiredHud()).toEqual({
       timestamp: '',
       rows: ['KEY REQUIRED', 'OPEN PHONE', '', ''],
+      sentimentGauge: '',
     });
   });
 });
@@ -114,6 +153,7 @@ describe('formatLoadingHud', () => {
     ).toEqual({
       timestamp: '',
       rows: ['BTC   LOADING', 'ETH   LOADING', '', ''],
+      sentimentGauge: '',
     });
   });
 });

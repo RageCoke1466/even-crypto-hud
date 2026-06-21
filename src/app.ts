@@ -54,6 +54,7 @@ export function buildEmptyWatchlistState(): CryptoAppState {
     hudText: {
       timestamp: '',
       rows: ['', '', '', ''],
+      sentimentGauge: '',
     },
     shouldFetch: false,
   };

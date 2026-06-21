@@ -1,4 +1,5 @@
 import type { WatchlistCoin } from '../settings/watchlistStore';
+import type { MarketGaugeSnapshot } from '../market/types';
 
 export interface CryptoPriceSnapshot {
   coin: WatchlistCoin;
@@ -13,6 +14,7 @@ export interface CryptoWatchlistSnapshot {
   assets: CryptoPriceSnapshot[];
   updatedAt: Date;
   provider: 'coingecko' | 'mock';
+  marketGauge?: MarketGaugeSnapshot;
 }
 
 export interface PriceProvider {
