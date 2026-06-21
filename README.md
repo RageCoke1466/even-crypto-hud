@@ -6,7 +6,7 @@
 
 A small TypeScript Even Hub app for showing a crypto watchlist on Even G2 glasses.
 
-The app uses CoinGecko as a read-only price and market activity data provider, lets the user enter a CoinGecko Demo API key, and renders the first four watchlist coins in a pixel-style HUD card.
+The app uses CoinGecko as a read-only price and market activity data provider, lets the user enter a CoinGecko Demo API key, and renders the watchlist as four-coin pages in a pixel-style HUD card.
 
 It does not trade, place orders, or connect to wallets.
 
@@ -69,13 +69,14 @@ Then scan the QR code from the Even Realities App developer area and launch the 
 ## Simulator
 
 ```bash
-pnpm exec evenhub-simulator http://localhost:5173/
+pnpm simulator
 ```
 
-For automated screenshots:
+This starts Vite on `127.0.0.1:5173`, waits for it to be ready, then starts the EvenHub simulator with automation on port `9898`. Press `Ctrl-C` once to stop both processes.
+
+For automated screenshots while `pnpm simulator` is running:
 
 ```bash
-pnpm exec evenhub-simulator http://localhost:5173/ --automation-port 9898
 curl -fsS http://localhost:9898/api/screenshot/glasses -o /tmp/even-crypto-glasses.png
 ```
 
@@ -102,6 +103,6 @@ pnpm run build
 - Price refresh interval is 5 minutes.
 - The right-lower market activity scale is derived from CoinGecko volume, volatility, and trending data.
 - CoinGecko catalog cache lasts 30 minutes.
-- Only the first four watchlist coins are sent to glasses.
+- Glasses show four watchlist coins per page. Scroll down for the next page and scroll up for the previous page.
 - `app.json` grants network access only to `https://api.coingecko.com`.
 - The app logs non-secret diagnostics with the `[even-crypto]` prefix.

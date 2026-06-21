@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCryptoHudPage, buildCryptoHudUpdates } from './cryptoPage';
+import { buildCryptoHudPage, buildCryptoHudUpdates, getCryptoHudLayoutKey } from './cryptoPage';
 
 const hudText = {
   timestamp: 'LAST UPDATED 14:32',
@@ -13,9 +13,10 @@ const hudText = {
 };
 
 describe('buildCryptoHudPage', () => {
-  it('creates a watchlist card with one border, a top-right timestamp, and four row containers', () => {
+  it('creates a watchlist card within the simulator container limit', () => {
     const page = buildCryptoHudPage(hudText);
 
+    expect(page.containerTotalNum).toBeLessThanOrEqual(8);
     expect(page.containerTotalNum).toBe(7);
     expect(page.textObject).toHaveLength(7);
     expect(page.textObject?.map((container) => container.containerName)).toEqual([
@@ -57,26 +58,40 @@ describe('buildCryptoHudPage', () => {
       xPosition: 48,
       yPosition: 82,
       width: 480,
-      height: 38,
+      height: 32,
       content: 'BTC   $67,412',
     });
     expect(row4).toMatchObject({
       containerID: 6,
       xPosition: 48,
-      yPosition: 208,
+      yPosition: 193,
       width: 480,
-      height: 38,
+      height: 32,
       content: 'XRP     $2.41',
     });
     expect(activityGauge).toMatchObject({
       containerID: 7,
       xPosition: 300,
-      yPosition: 208,
+      yPosition: 193,
       width: 228,
-      height: 38,
+      height: 32,
       content: 'QUIET \\---^---/ ACTIVE',
     });
+    expect(activityGauge?.yPosition).toBe(row4?.yPosition);
     expect(page.textObject?.map((container) => container.content).join(' ')).not.toContain('24h');
+  });
+
+  it('places the activity gauge beside the last populated token row on short pages', () => {
+    const page = buildCryptoHudPage({
+      timestamp: 'LAST UPDATED 14:32',
+      rows: ['DOGE    $1.00', 'ADA     $1.00', '', ''],
+      activityGauge: 'QUIET \\---^---/ ACTIVE',
+    });
+
+    expect(page.textObject?.find((container) => container.containerName === 'activityGauge')).toMatchObject({
+      yPosition: 119,
+      content: 'QUIET \\---^---/ ACTIVE',
+    });
   });
 
   it('uses the root card as the only event capture container', () => {
@@ -143,6 +158,21 @@ describe('buildCryptoHudUpdates', () => {
     ]);
   });
 
+  it('keeps the activity gauge update targeted at the reusable gauge container', () => {
+    const updates = buildCryptoHudUpdates({
+      timestamp: 'LAST UPDATED 14:32',
+      rows: ['DOGE    $1.00', 'ADA     $1.00', '', ''],
+      activityGauge: 'QUIET \\---^---/ ACTIVE',
+    });
+
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        containerName: 'activityGauge',
+        content: 'QUIET \\---^---/ ACTIVE'.padEnd(24, ' '),
+      }),
+    );
+  });
+
   it('pads shorter update content so stale row text is cleared on glasses', () => {
     const updates = buildCryptoHudUpdates({
       timestamp: '',
@@ -171,5 +201,18 @@ describe('buildCryptoHudUpdates', () => {
       contentLength: 24,
       content: '                        ',
     });
+  });
+});
+
+describe('getCryptoHudLayoutKey', () => {
+  it('changes when the market activity gauge needs to move to a different row', () => {
+    expect(getCryptoHudLayoutKey(hudText)).toBe('activity-row:3');
+    expect(
+      getCryptoHudLayoutKey({
+        timestamp: 'LAST UPDATED 14:32',
+        rows: ['DOGE    $1.00', 'ADA     $1.00', '', ''],
+        activityGauge: 'QUIET \\---^---/ ACTIVE',
+      }),
+    ).toBe('activity-row:1');
   });
 });
