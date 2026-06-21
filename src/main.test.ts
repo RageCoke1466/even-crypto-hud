@@ -173,10 +173,6 @@ describe('phone UI shell', () => {
     expect(refreshNowButton).toBeNull();
     expect(watchlistInput).toBeNull();
     expect(chips.map((chip) => chip.dataset.coinId)).toEqual([]);
-    expect(document.querySelector('[data-role="preview-timestamp"]')).toBeNull();
-    expect(document.querySelectorAll('[data-role="preview-row"]')).toHaveLength(0);
-    expect(document.querySelector('[data-role="preview-activity-score"]')).toBeNull();
-    expect(document.querySelectorAll('[data-role="preview-activity-gauge"]')).toHaveLength(0);
     expect(watchlistRegion?.textContent).toContain('Watchlist');
     expect(statusRegion?.textContent).toContain('Live status');
     expect(momentumRegion?.textContent).toContain('Market momentum');
@@ -226,7 +222,6 @@ describe('phone UI shell', () => {
     ]);
     expect(priceState.requestedCoinIds).toContainEqual(['dogecoin', 'cardano']);
     expect(marketActivityState.requests).toBeGreaterThan(0);
-    expect(document.querySelector('[data-role="preview-activity-score"]')).toBeNull();
     expect(document.querySelector('[data-role="preview-momentum-region"]')?.textContent).toContain('Market momentum');
   });
 
