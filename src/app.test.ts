@@ -36,6 +36,19 @@ describe('app state helpers', () => {
     });
   });
 
+  it('includes a page indicator while loading a multi-page watchlist page', () => {
+    expect(buildLoadingState([watchlist[0]], { currentPage: 1, totalPages: 2 })).toEqual({
+      status: 'loading',
+      message: 'Fetching BTC from CoinGecko...',
+      hudText: {
+        timestamp: 'PAGE 2/2',
+        rows: ['BTC   LOADING', '', '', ''],
+        activityGauge: '',
+      },
+      shouldFetch: true,
+    });
+  });
+
   it('uses an idle state when the watchlist is empty', () => {
     expect(buildEmptyWatchlistState()).toEqual({
       status: 'ready',
@@ -107,6 +120,44 @@ describe('app state helpers', () => {
         timestamp: `LAST UPDATED ${localTime}`,
         rows: ['BTC   $67,412.42', 'ETH   $3,540.12', 'SOL   $172.40', 'XRP     $2.41'],
         activityGauge: 'QUIET \\-^-----/ ACTIVE',
+      },
+      shouldFetch: true,
+    });
+  });
+
+  it('includes a compact page indicator for a loaded multi-page watchlist page', () => {
+    const updatedAt = new Date('2026-06-07T21:32:00.000Z');
+    const localTime = new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(updatedAt);
+
+    expect(
+      buildSnapshotState(
+        {
+          quoteSymbol: 'USD',
+          assets: [
+            {
+              coin: watchlist[0],
+              quoteSymbol: 'USD',
+              price: 67412.42,
+              updatedAt,
+              provider: 'coingecko',
+            },
+          ],
+          updatedAt,
+          provider: 'coingecko',
+        },
+        { currentPage: 1, totalPages: 2 },
+      ),
+    ).toEqual({
+      status: 'ready',
+      message: 'BTC updated from CoinGecko.',
+      hudText: {
+        timestamp: `LAST ${localTime} P2/2`,
+        rows: ['BTC   $67,412.42', '', '', ''],
+        activityGauge: '',
       },
       shouldFetch: true,
     });
