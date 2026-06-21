@@ -9,12 +9,13 @@ import {
   type CryptoAppState,
 } from './app';
 import { connectEvenBridge, hasEvenHostBridge } from './even/bridge';
-import { createCryptoHudPage, updateCryptoHudPage } from './even/cryptoPage';
-import type { HudText } from './formatters/priceFormatter';
+import { createCryptoHudPage, getCryptoHudLayoutKey, updateCryptoHudPage } from './even/cryptoPage';
+import { type HudPageContext, type HudText } from './formatters/priceFormatter';
 import { CoinGeckoMarketActivitySource } from './market/coinGeckoMarketActivitySource';
 import type { MarketActivitySnapshot } from './market/types';
 import { CoinGeckoCoinCatalogSource } from './prices/coinCatalogSource';
 import { CoinGeckoPriceSource } from './prices/coingeckoPriceSource';
+import type { CryptoWatchlistSnapshot } from './prices/types';
 import {
   clearApiKeyFromBridgeStorage,
   createBrowserApiKeyStore,
@@ -34,6 +35,13 @@ import {
   type CoinCatalogEntry,
   type WatchlistCoin,
 } from './settings/watchlistStore';
+import {
+  getNextWatchlistPageIndex,
+  getWatchlistPage,
+  getWatchlistPageCount,
+  normalizeWatchlistPageIndex,
+  type WatchlistPageDirection,
+} from './settings/watchlistPaging';
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -52,8 +60,11 @@ let evenBridge: Awaited<ReturnType<typeof connectEvenBridge>> | null = null;
 let unsubscribeEvenHubEvents: (() => void) | null = null;
 let glassesPageCreated = false;
 let glassesPageShuttingDown = false;
+let currentHudLayoutKey: string | null = null;
 let currentHudText: HudText = buildMissingKeyState().hudText;
 let currentMarketActivity: MarketActivitySnapshot | undefined;
+let currentWatchlistPageIndex = 0;
+let latestSnapshot: CryptoWatchlistSnapshot | null = null;
 let coinCatalog: CoinCatalogEntry[] = coinCatalogStore.loadFresh(new Date()) ?? coinCatalogStore.loadAny() ?? [
   ...DEFAULT_WATCHLIST,
 ];
@@ -64,7 +75,7 @@ function startApp(): void {
   bindEvents();
   renderWatchlistControls();
   renderCoinSearchResults();
-  renderState(keyStore.load() ? buildLoadingState(getVisibleWatchlist()) : buildMissingKeyState());
+  renderState(keyStore.load() ? buildLoadingState(getCurrentWatchlistPage(), getCurrentPageContext()) : buildMissingKeyState());
   void connectBridgeInBackground();
   void loadCoinCatalogInBackground();
   void refreshPrice();
@@ -191,11 +202,18 @@ function bindEvenHubEvents(bridge: Awaited<ReturnType<typeof connectEvenBridge>>
   }
 
   unsubscribeEvenHubEvents = bridge.onEvenHubEvent((event) => {
-    if (!isDoubleTapEvent(event)) {
+    if (isDoubleTapEvent(event)) {
+      void shutDownGlassesPage();
       return;
     }
 
-    void shutDownGlassesPage();
+    const pageDirection = scrollPageDirectionFromEvent(event);
+
+    if (!pageDirection) {
+      return;
+    }
+
+    void turnWatchlistPage(pageDirection);
   });
 }
 
@@ -203,6 +221,33 @@ function isDoubleTapEvent(event: EvenHubEvent): boolean {
   return [event.textEvent?.eventType, event.listEvent?.eventType, event.sysEvent?.eventType].includes(
     OsEventTypeList.DOUBLE_CLICK_EVENT,
   );
+}
+
+function scrollPageDirectionFromEvent(event: EvenHubEvent): WatchlistPageDirection | null {
+  const eventTypes = [event.textEvent?.eventType, event.listEvent?.eventType, event.sysEvent?.eventType];
+
+  if (eventTypes.includes(OsEventTypeList.SCROLL_BOTTOM_EVENT)) {
+    return 'next';
+  }
+
+  if (eventTypes.includes(OsEventTypeList.SCROLL_TOP_EVENT)) {
+    return 'previous';
+  }
+
+  return null;
+}
+
+async function turnWatchlistPage(direction: WatchlistPageDirection): Promise<void> {
+  const watchlist = watchlistStore.load();
+
+  if (getWatchlistPageCount(watchlist) <= 1) {
+    return;
+  }
+
+  currentWatchlistPageIndex = getNextWatchlistPageIndex(currentWatchlistPageIndex, watchlist, direction);
+  const state = buildCurrentWatchlistPageState();
+  renderState(state);
+  await syncGlasses(state.hudText);
 }
 
 async function shutDownGlassesPage(): Promise<void> {
@@ -411,10 +456,14 @@ async function loadCoinCatalogInBackground(): Promise<void> {
 
 async function refreshPrice(options: { syncLoadingToGlasses?: boolean } = {}): Promise<void> {
   const apiKey = keyStore.load();
-  const visibleWatchlist = getVisibleWatchlist();
+  const watchlist = watchlistStore.load();
+  currentWatchlistPageIndex = normalizeWatchlistPageIndex(currentWatchlistPageIndex, watchlist);
+  const visibleWatchlist = getCurrentWatchlistPage();
+  const pageContext = getCurrentPageContext();
   renderWatchlistControls();
 
   if (!apiKey) {
+    latestSnapshot = null;
     const state = buildMissingKeyState();
     renderState(state);
     await syncGlasses(state.hudText);
@@ -422,13 +471,15 @@ async function refreshPrice(options: { syncLoadingToGlasses?: boolean } = {}): P
   }
 
   if (visibleWatchlist.length === 0) {
+    latestSnapshot = null;
     const state = buildEmptyWatchlistState();
     renderState(state);
     await syncGlasses(state.hudText);
     return;
   }
 
-  const loadingState = buildLoadingState(visibleWatchlist);
+  latestSnapshot = null;
+  const loadingState = buildLoadingState(visibleWatchlist, pageContext);
   renderState(loadingState);
 
   if (options.syncLoadingToGlasses) {
@@ -437,10 +488,11 @@ async function refreshPrice(options: { syncLoadingToGlasses?: boolean } = {}): P
 
   try {
     const [snapshot, marketActivity] = await Promise.all([
-      new CoinGeckoPriceSource({ apiKey }).getPrices(visibleWatchlist),
+      new CoinGeckoPriceSource({ apiKey }).getPrices(watchlist),
       refreshMarketActivity(apiKey),
     ]);
-    const state = buildSnapshotState({ ...snapshot, marketActivity });
+    latestSnapshot = { ...snapshot, marketActivity };
+    const state = buildSnapshotState(getCurrentSnapshotPage(latestSnapshot), pageContext);
     renderState(state);
     await syncGlasses(state.hudText);
   } catch (error) {
@@ -462,41 +514,31 @@ async function refreshMarketActivity(apiKey: string): Promise<MarketActivitySnap
 
 async function syncGlasses(hudText: HudText): Promise<void> {
   currentHudText = hudText;
+  const nextHudLayoutKey = getCryptoHudLayoutKey(hudText);
 
   if (!evenBridge) {
-    renderPreview(hudText);
     return;
   }
 
-  if (!glassesPageCreated) {
+  if (!glassesPageCreated || currentHudLayoutKey !== nextHudLayoutKey) {
     const result = await createCryptoHudPage(evenBridge, hudText);
     glassesPageCreated = result === 0;
+    currentHudLayoutKey = glassesPageCreated ? nextHudLayoutKey : null;
     updateBridgeStatus(glassesPageCreated ? 'Glasses HUD created.' : `Glasses HUD create failed: ${result}`);
-    renderPreview(hudText);
     return;
   }
 
   await updateCryptoHudPage(evenBridge, hudText);
-  renderPreview(hudText);
 }
 
 function renderState(state: CryptoAppState): void {
-  elements.statusValue.textContent = state.status;
-  elements.statusValue.dataset.status = state.status;
   elements.message.textContent = state.message;
-  renderPreview(state.hudText);
-}
-
-function renderPreview(hudText: HudText): void {
-  elements.previewTimestamp.textContent = hudText.timestamp;
-  elements.previewRows.forEach((row, index) => {
-    row.textContent = hudText.rows[index];
-  });
-  elements.previewActivityGauge.textContent = hudText.activityGauge;
 }
 
 function updateBridgeStatus(message: string): void {
-  elements.bridgeStatus.textContent = message;
+  if (elements.bridgeStatus) {
+    elements.bridgeStatus.textContent = message;
+  }
 }
 
 function areWatchlistsEqual(first: WatchlistCoin[], second: WatchlistCoin[]): boolean {
@@ -532,8 +574,42 @@ function renderWatchlistControls(): void {
   elements.firstFourNote.hidden = watchlist.length <= 4;
 }
 
-function getVisibleWatchlist(): WatchlistCoin[] {
-  return watchlistStore.load().slice(0, 4);
+function buildCurrentWatchlistPageState(): CryptoAppState {
+  const apiKey = keyStore.load();
+  const watchlist = watchlistStore.load();
+  currentWatchlistPageIndex = normalizeWatchlistPageIndex(currentWatchlistPageIndex, watchlist);
+
+  if (!apiKey) {
+    return buildMissingKeyState();
+  }
+
+  if (watchlist.length === 0) {
+    return buildEmptyWatchlistState();
+  }
+
+  if (latestSnapshot) {
+    return buildSnapshotState(getCurrentSnapshotPage(latestSnapshot), getCurrentPageContext(watchlist));
+  }
+
+  return buildLoadingState(getCurrentWatchlistPage(watchlist), getCurrentPageContext(watchlist));
+}
+
+function getCurrentWatchlistPage(watchlist = watchlistStore.load()): WatchlistCoin[] {
+  return getWatchlistPage(watchlist, currentWatchlistPageIndex);
+}
+
+function getCurrentSnapshotPage(snapshot: CryptoWatchlistSnapshot): CryptoWatchlistSnapshot {
+  return {
+    ...snapshot,
+    assets: getWatchlistPage(snapshot.assets, currentWatchlistPageIndex),
+  };
+}
+
+function getCurrentPageContext(watchlist = watchlistStore.load()): HudPageContext {
+  return {
+    currentPage: normalizeWatchlistPageIndex(currentWatchlistPageIndex, watchlist),
+    totalPages: getWatchlistPageCount(watchlist),
+  };
 }
 
 function buildCoinResultElement(coin: WatchlistCoin): HTMLLIElement {
@@ -591,57 +667,57 @@ function renderShell(container: HTMLElement) {
         <p class="eyebrow">Crypto Hub</p>
 
         <form class="key-form">
-          <label for="coingecko-key">CoinGecko Demo API key</label>
-          <input id="coingecko-key" name="coingecko-key" type="password" autocomplete="off" placeholder="Paste your CoinGecko key" />
+          <div class="actions">
+            <label for="coingecko-key">CoinGecko API key</label>
+            <input id="coingecko-key" name="coingecko-key" type="password" autocomplete="off" placeholder="Paste your CoinGecko key" />
+            <button type="submit">Save key</button>
+            <div class="help">
+              <span>CoinGecko API key required</span>
+              <span>Default refresh: 5 minutes</span>
+              <span>Market activity by CoinGecko</span>
+            </div>
+          </div>
           <label for="coin-search">Add coin</label>
           <input id="coin-search" name="coin-search" type="text" autocomplete="off" placeholder="Search by symbol, name, or id" />
           <ul class="coin-results" data-role="coin-results"></ul>
           <div class="watchlist-editor">
             <div class="watchlist-title">
               <span>Watchlist</span>
-              <button type="button" data-action="refresh-watchlist">Refresh watchlist</button>
+              <div class="watchlist-actions">
+                <button type="button" data-action="refresh-watchlist">Refresh watchlist</button>
+                <button type="button" data-action="clear">Clear</button>
+              </div>
             </div>
             <ul class="watchlist-list" data-role="watchlist-list"></ul>
-            <p class="first-four-note" data-role="first-four-note" hidden>Only the first four coins appear on glasses.</p>
-          </div>
-          <div class="actions">
-            <button type="submit">Save key</button>
-            <button type="button" data-action="clear">Clear</button>
+            <p class="first-four-note" data-role="first-four-note" hidden>Swipe up/down on glasses to page through four coins at a time.</p>
           </div>
         </form>
-
-        <div class="help">
-          <span>CoinGecko Demo API key required</span>
-          <span>Default refresh: 5 minutes</span>
-          <span>Market activity by CoinGecko</span>
-        </div>
-
-        <dl class="status-grid">
-          <div>
-            <dt>Provider</dt>
-            <dd data-role="status">missing-key</dd>
-          </div>
-          <div>
-            <dt>Bridge</dt>
-            <dd data-role="bridge">Waiting for Even bridge...</dd>
-          </div>
-        </dl>
-
         <p class="message" data-role="message"></p>
       </div>
 
-      <section class="preview-area" aria-label="Glasses preview">
+      <section class="preview-area" aria-label="Glasses layout guide">
         <div class="screen">
-          <div class="hud-card">
-            <div class="hud-timestamp" data-role="preview-timestamp"></div>
-            <div class="hud-rows" aria-label="Watchlist preview rows">
-              <div class="hud-row" data-role="preview-row">KEY REQUIRED</div>
-              <div class="hud-row" data-role="preview-row">OPEN PHONE</div>
-              <div class="hud-row" data-role="preview-row"></div>
-              <div class="hud-row" data-role="preview-row"></div>
+          <div class="hud-card hud-guide">
+            <div class="hud-guide-region hud-guide-watchlist" data-role="preview-watchlist-region">
+              <span class="hud-guide-kicker">Left</span>
+              <span class="hud-guide-title">Watchlist</span>
+              <span class="hud-guide-detail">Selected coins and prices</span>
+              <div class="hud-guide-list" aria-hidden="true">
+                <span>BTC</span>
+                <span>ETH</span>
+                <span>SOL</span>
+                <span>IP</span>
+              </div>
             </div>
-            <div class="hud-activity" aria-label="Market activity preview">
-              <div class="hud-activity-gauge" data-role="preview-activity-gauge"></div>
+            <div class="hud-guide-region hud-guide-status" data-role="preview-status-region">
+              <span class="hud-guide-kicker">Upper right</span>
+              <span class="hud-guide-title">Live status</span>
+              <span class="hud-guide-detail">Last update and page</span>
+            </div>
+            <div class="hud-guide-region hud-guide-momentum" data-role="preview-momentum-region">
+              <span class="hud-guide-kicker">Lower right</span>
+              <span class="hud-guide-title">Market momentum</span>
+              <span class="hud-guide-detail">Quiet to active</span>
             </div>
           </div>
         </div>
@@ -657,12 +733,11 @@ function renderShell(container: HTMLElement) {
   const resultsList = container.querySelector<HTMLElement>('[data-role="coin-results"]');
   const watchlistList = container.querySelector<HTMLElement>('[data-role="watchlist-list"]');
   const firstFourNote = container.querySelector<HTMLElement>('[data-role="first-four-note"]');
-  const statusValue = container.querySelector<HTMLElement>('[data-role="status"]');
   const bridgeStatus = container.querySelector<HTMLElement>('[data-role="bridge"]');
   const message = container.querySelector<HTMLElement>('[data-role="message"]');
-  const previewTimestamp = container.querySelector<HTMLElement>('[data-role="preview-timestamp"]');
-  const previewRows = Array.from(container.querySelectorAll<HTMLElement>('[data-role="preview-row"]'));
-  const previewActivityGauge = container.querySelector<HTMLElement>('[data-role="preview-activity-gauge"]');
+  const previewWatchlistRegion = container.querySelector<HTMLElement>('[data-role="preview-watchlist-region"]');
+  const previewStatusRegion = container.querySelector<HTMLElement>('[data-role="preview-status-region"]');
+  const previewMomentumRegion = container.querySelector<HTMLElement>('[data-role="preview-momentum-region"]');
 
   if (
     !apiKeyInput ||
@@ -673,12 +748,10 @@ function renderShell(container: HTMLElement) {
     !resultsList ||
     !watchlistList ||
     !firstFourNote ||
-    !statusValue ||
-    !bridgeStatus ||
     !message ||
-    !previewTimestamp ||
-    !previewActivityGauge ||
-    previewRows.length !== 4
+    !previewWatchlistRegion ||
+    !previewStatusRegion ||
+    !previewMomentumRegion
   ) {
     throw new Error('Failed to render app shell');
   }
@@ -697,11 +770,10 @@ function renderShell(container: HTMLElement) {
     resultsList,
     watchlistList,
     firstFourNote,
-    statusValue,
     bridgeStatus,
     message,
-    previewTimestamp,
-    previewRows,
-    previewActivityGauge,
+    previewWatchlistRegion,
+    previewStatusRegion,
+    previewMomentumRegion,
   };
 }

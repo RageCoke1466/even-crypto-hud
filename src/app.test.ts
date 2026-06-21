@@ -12,7 +12,6 @@ const watchlist: WatchlistCoin[] = [
 describe('app state helpers', () => {
   it('uses onboarding state when the CoinGecko key is missing', () => {
     expect(buildMissingKeyState()).toEqual({
-      status: 'missing-key',
       message: 'Paste a CoinGecko Demo API key on the phone to start watchlist updates.',
       hudText: {
         timestamp: '',
@@ -25,7 +24,6 @@ describe('app state helpers', () => {
 
   it('uses selected symbols while loading a watchlist', () => {
     expect(buildLoadingState(watchlist.slice(0, 2))).toEqual({
-      status: 'loading',
       message: 'Fetching BTC, ETH from CoinGecko...',
       hudText: {
         timestamp: '',
@@ -36,9 +34,20 @@ describe('app state helpers', () => {
     });
   });
 
+  it('includes a page indicator while loading a multi-page watchlist page', () => {
+    expect(buildLoadingState([watchlist[0]], { currentPage: 1, totalPages: 2 })).toEqual({
+      message: 'Fetching BTC from CoinGecko...',
+      hudText: {
+        timestamp: 'PAGE 2/2',
+        rows: ['BTC   LOADING', '', '', ''],
+        activityGauge: '',
+      },
+      shouldFetch: true,
+    });
+  });
+
   it('uses an idle state when the watchlist is empty', () => {
     expect(buildEmptyWatchlistState()).toEqual({
-      status: 'ready',
       message: 'Add a coin to your watchlist to start updates.',
       hudText: {
         timestamp: '',
@@ -101,12 +110,48 @@ describe('app state helpers', () => {
     });
 
     expect(state).toEqual({
-      status: 'ready',
       message: 'BTC, ETH, SOL, XRP updated from CoinGecko.',
       hudText: {
         timestamp: `LAST UPDATED ${localTime}`,
         rows: ['BTC   $67,412.42', 'ETH   $3,540.12', 'SOL   $172.40', 'XRP     $2.41'],
         activityGauge: 'QUIET \\-^-----/ ACTIVE',
+      },
+      shouldFetch: true,
+    });
+  });
+
+  it('includes a compact page indicator for a loaded multi-page watchlist page', () => {
+    const updatedAt = new Date('2026-06-07T21:32:00.000Z');
+    const localTime = new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(updatedAt);
+
+    expect(
+      buildSnapshotState(
+        {
+          quoteSymbol: 'USD',
+          assets: [
+            {
+              coin: watchlist[0],
+              quoteSymbol: 'USD',
+              price: 67412.42,
+              updatedAt,
+              provider: 'coingecko',
+            },
+          ],
+          updatedAt,
+          provider: 'coingecko',
+        },
+        { currentPage: 1, totalPages: 2 },
+      ),
+    ).toEqual({
+      message: 'BTC updated from CoinGecko.',
+      hudText: {
+        timestamp: `LAST ${localTime} P2/2`,
+        rows: ['BTC   $67,412.42', '', '', ''],
+        activityGauge: '',
       },
       shouldFetch: true,
     });

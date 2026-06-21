@@ -134,6 +134,35 @@ describe('formatHudSnapshot', () => {
     });
     expect(formatted).not.toHaveProperty('activityScore');
   });
+
+  it('uses a compact timestamp with a page indicator when the watchlist has multiple pages', () => {
+    const updatedAt = new Date('2026-06-07T21:32:00.000Z');
+    const localTime = new Intl.DateTimeFormat('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(updatedAt);
+    const snapshot: CryptoWatchlistSnapshot = {
+      quoteSymbol: 'USD',
+      assets: [
+        {
+          coin: { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin' },
+          quoteSymbol: 'USD',
+          price: 1,
+          updatedAt,
+          provider: 'coingecko',
+        },
+      ],
+      updatedAt,
+      provider: 'coingecko',
+    };
+
+    expect(formatHudSnapshot(snapshot, { currentPage: 1, totalPages: 2 })).toEqual({
+      timestamp: `LAST ${localTime} P2/2`,
+      rows: ['DOGE    $1.00', '', '', ''],
+      activityGauge: '',
+    });
+  });
 });
 
 describe('formatKeyRequiredHud', () => {
@@ -156,6 +185,19 @@ describe('formatLoadingHud', () => {
     ).toEqual({
       timestamp: '',
       rows: ['BTC   LOADING', 'ETH   LOADING', '', ''],
+      activityGauge: '',
+    });
+  });
+
+  it('shows the active page while a multi-page watchlist loads', () => {
+    expect(
+      formatLoadingHud([{ id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin' }], {
+        currentPage: 1,
+        totalPages: 2,
+      }),
+    ).toEqual({
+      timestamp: 'PAGE 2/2',
+      rows: ['DOGE  LOADING', '', '', ''],
       activityGauge: '',
     });
   });

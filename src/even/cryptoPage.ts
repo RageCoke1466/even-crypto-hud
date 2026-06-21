@@ -4,7 +4,7 @@ import {
   TextContainerUpgrade,
   type EvenAppBridge,
 } from '@evenrealities/even_hub_sdk';
-import type { HudText } from '../formatters/priceFormatter';
+import { getHudActivityRowIndex, type HudText } from '../formatters/priceFormatter';
 
 const CONTAINERS = {
   card: { id: 1, name: 'card' },
@@ -18,8 +18,12 @@ const CONTAINERS = {
 const TIMESTAMP_UPDATE_LENGTH = 18;
 const ROW_UPDATE_LENGTH = 32;
 const ACTIVITY_GAUGE_UPDATE_LENGTH = 24;
+const ROW_HEIGHT = 32;
+const ROW_Y_POSITIONS = [82, 119, 156, 193] as const;
 
 export function buildCryptoHudPage(text: HudText): CreateStartUpPageContainer {
+  const activityGaugeRowIndex = getHudActivityRowIndex(text);
+
   return new CreateStartUpPageContainer({
     containerTotalNum: 7,
     textObject: [
@@ -51,24 +55,16 @@ export function buildCryptoHudPage(text: HudText): CreateStartUpPageContainer {
         content: text.timestamp,
         isEventCapture: 0,
       }),
-      buildRowContainer(CONTAINERS.row1.id, CONTAINERS.row1.name, 82, text.rows[0]),
-      buildRowContainer(CONTAINERS.row2.id, CONTAINERS.row2.name, 124, text.rows[1]),
-      buildRowContainer(CONTAINERS.row3.id, CONTAINERS.row3.name, 166, text.rows[2]),
-      buildRowContainer(CONTAINERS.row4.id, CONTAINERS.row4.name, 208, text.rows[3]),
-      new TextContainerProperty({
-        xPosition: 300,
-        yPosition: 208,
-        width: 228,
-        height: 38,
-        borderWidth: 0,
-        borderColor: 0,
-        borderRadius: 0,
-        paddingLength: 0,
-        containerID: CONTAINERS.activityGauge.id,
-        containerName: CONTAINERS.activityGauge.name,
-        content: text.activityGauge,
-        isEventCapture: 0,
-      }),
+      buildRowContainer(CONTAINERS.row1.id, CONTAINERS.row1.name, ROW_Y_POSITIONS[0], text.rows[0]),
+      buildRowContainer(CONTAINERS.row2.id, CONTAINERS.row2.name, ROW_Y_POSITIONS[1], text.rows[1]),
+      buildRowContainer(CONTAINERS.row3.id, CONTAINERS.row3.name, ROW_Y_POSITIONS[2], text.rows[2]),
+      buildRowContainer(CONTAINERS.row4.id, CONTAINERS.row4.name, ROW_Y_POSITIONS[3], text.rows[3]),
+      buildActivityGaugeContainer(
+        CONTAINERS.activityGauge.id,
+        CONTAINERS.activityGauge.name,
+        ROW_Y_POSITIONS[activityGaugeRowIndex] ?? ROW_Y_POSITIONS[ROW_Y_POSITIONS.length - 1],
+        text.activityGauge,
+      ),
     ],
   });
 }
@@ -87,6 +83,10 @@ export function buildCryptoHudUpdates(text: HudText): TextContainerUpgrade[] {
       ACTIVITY_GAUGE_UPDATE_LENGTH,
     ),
   ];
+}
+
+export function getCryptoHudLayoutKey(text: HudText): string {
+  return `activity-row:${getHudActivityRowIndex(text)}`;
 }
 
 export async function createCryptoHudPage(bridge: EvenAppBridge, text: HudText) {
@@ -125,7 +125,29 @@ function buildRowContainer(
     xPosition: 48,
     yPosition,
     width: 480,
-    height: 38,
+    height: ROW_HEIGHT,
+    borderWidth: 0,
+    borderColor: 0,
+    borderRadius: 0,
+    paddingLength: 0,
+    containerID,
+    containerName,
+    content,
+    isEventCapture: 0,
+  });
+}
+
+function buildActivityGaugeContainer(
+  containerID: number,
+  containerName: string,
+  yPosition: number,
+  content: string,
+): TextContainerProperty {
+  return new TextContainerProperty({
+    xPosition: 300,
+    yPosition,
+    width: 228,
+    height: ROW_HEIGHT,
     borderWidth: 0,
     borderColor: 0,
     borderRadius: 0,
