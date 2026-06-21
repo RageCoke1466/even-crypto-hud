@@ -148,7 +148,7 @@ describe('phone UI shell', () => {
     document.body.innerHTML = '<div id="app"></div>';
   });
 
-  it('renders coin search controls, an empty watchlist, and the four-row glasses preview', async () => {
+  it('renders coin search controls, an empty watchlist, and the glasses layout guide', async () => {
     await import('./main');
 
     const appTitle = document.querySelector<HTMLElement>('.eyebrow');
@@ -157,8 +157,9 @@ describe('phone UI shell', () => {
     const refreshNowButton = document.querySelector<HTMLButtonElement>('[data-action="refresh"]');
     const watchlistInput = document.querySelector<HTMLInputElement>('#watchlist-symbols');
     const chips = Array.from(document.querySelectorAll<HTMLElement>('[data-role="watchlist-chip"]'));
-    const previewRows = Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-row"]'));
-    const previewActivityGauges = Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-activity-gauge"]'));
+    const watchlistRegion = document.querySelector<HTMLElement>('[data-role="preview-watchlist-region"]');
+    const statusRegion = document.querySelector<HTMLElement>('[data-role="preview-status-region"]');
+    const momentumRegion = document.querySelector<HTMLElement>('[data-role="preview-momentum-region"]');
 
     expect(appTitle?.textContent).toBe('Crypto Hub');
     expect(document.body.textContent).not.toContain('Even G2 Crypto HUD');
@@ -172,11 +173,9 @@ describe('phone UI shell', () => {
     expect(refreshNowButton).toBeNull();
     expect(watchlistInput).toBeNull();
     expect(chips.map((chip) => chip.dataset.coinId)).toEqual([]);
-    expect(document.querySelector('[data-role="preview-timestamp"]')?.textContent).toBe('');
-    expect(previewRows.map((row) => row.textContent)).toEqual(['KEY REQUIRED', 'OPEN PHONE', '', '']);
-    expect(document.querySelector('[data-role="preview-activity-score"]')).toBeNull();
-    expect(previewActivityGauges).toHaveLength(4);
-    expect(previewActivityGauges.map((gauge) => gauge.textContent)).toEqual(['', '', '', '']);
+    expect(watchlistRegion?.textContent).toContain('Watchlist');
+    expect(statusRegion?.textContent).toContain('Live status');
+    expect(momentumRegion?.textContent).toContain('Market momentum');
   });
 
   it('restores a saved CoinGecko key from Even App bridge storage after launch', async () => {
@@ -215,7 +214,6 @@ describe('phone UI shell', () => {
     await flushAsyncWork();
 
     const chips = Array.from(document.querySelectorAll<HTMLElement>('[data-role="watchlist-chip"]'));
-    const previewActivityGauges = Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-activity-gauge"]'));
 
     expect(chips.map((chip) => chip.dataset.coinId)).toEqual(['dogecoin', 'cardano']);
     expect(JSON.parse(window.localStorage.getItem('even-crypto:watchlist') ?? '')).toEqual([
@@ -224,8 +222,7 @@ describe('phone UI shell', () => {
     ]);
     expect(priceState.requestedCoinIds).toContainEqual(['dogecoin', 'cardano']);
     expect(marketActivityState.requests).toBeGreaterThan(0);
-    expect(document.querySelector('[data-role="preview-activity-score"]')).toBeNull();
-    expect(previewActivityGauges.map((gauge) => gauge.textContent)).toEqual(['', 'QUIET \\---^---/ ACTIVE', '', '']);
+    expect(document.querySelector('[data-role="preview-momentum-region"]')?.textContent).toContain('Market momentum');
   });
 
   it('keeps watchlist prices visible when market activity data is unavailable', async () => {
@@ -246,11 +243,14 @@ describe('phone UI shell', () => {
     await import('./main');
     await flushAsyncWork();
 
-    const previewRows = Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-row"]'));
+    const firstPage = bridgeState.bridge.createStartUpPageContainer.mock.calls.at(-1)?.[0];
+    const firstPageRows = firstPage.textObject
+      ?.filter((container: { containerName?: string }) => container.containerName?.startsWith('row'))
+      .map((container: { content?: string }) => container.content);
 
     expect(priceState.requestedCoinIds).toContainEqual(['bitcoin']);
     expect(marketActivityState.requests).toBeGreaterThan(0);
-    expect(previewRows.map((row) => row.textContent)).toEqual(['BTC   $62,914.00', '', '', '']);
+    expect(firstPageRows).toEqual(['BTC   $62,914.00', '', '', '']);
     expect(document.querySelector('[data-role="message"]')?.textContent).toBe('BTC updated from CoinGecko.');
   });
 
@@ -369,11 +369,7 @@ describe('phone UI shell', () => {
     expect(firstPageTimestamp?.content).toMatch(/^LAST \d{2}:\d{2} P1\/2$/);
     expect(firstPageRows).toEqual(['BTC   $62,914.00', 'ETH   $1,676.00', 'SOL    $66.00', 'XRP     $1.16']);
     expect(document.querySelector<HTMLElement>('[data-role="first-four-note"]')?.hidden).toBe(false);
-    expect(
-      Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-activity-gauge"]')).map(
-        (gauge) => gauge.textContent,
-      ),
-    ).toEqual(['', '', '', 'QUIET \\---^---/ ACTIVE']);
+    expect(document.querySelector('[data-role="preview-watchlist-region"]')?.textContent).toContain('Watchlist');
 
     bridgeState.bridge.textContainerUpgrade.mockClear();
     bridgeState.bridge.createStartUpPageContainer.mockClear();
@@ -405,17 +401,7 @@ describe('phone UI shell', () => {
       yPosition: 119,
       content: 'QUIET \\---^---/ ACTIVE',
     });
-    expect(Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-row"]')).map((row) => row.textContent)).toEqual([
-      'DOGE    $1.00',
-      'ADA     $1.00',
-      '',
-      '',
-    ]);
-    expect(
-      Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-activity-gauge"]')).map(
-        (gauge) => gauge.textContent,
-      ),
-    ).toEqual(['', 'QUIET \\---^---/ ACTIVE', '', '']);
+    expect(document.querySelector('[data-role="preview-watchlist-region"]')?.textContent).toContain('Watchlist');
 
     bridgeState.bridge.textContainerUpgrade.mockClear();
     bridgeState.bridge.createStartUpPageContainer.mockClear();
