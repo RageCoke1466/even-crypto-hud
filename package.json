@@ -10,7 +10,7 @@
     "test": "vitest run",
     "build": "tsc && vite build",
     "pack": "evenhub pack app.json dist -o even-crypto.ehpk",
-    "simulator": "evenhub-simulator http://localhost:5173/ --automation-port 9898"
+    "simulator": "node scripts/run-simulator.mjs"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "^0.0.10"

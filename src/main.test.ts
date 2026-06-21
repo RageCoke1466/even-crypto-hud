@@ -3,7 +3,13 @@ import type { WatchlistCoin } from './settings/watchlistStore';
 
 const bridgeState = vi.hoisted(() => ({
   hasBridge: false,
-  evenHubCallbacks: [] as Array<(event: { textEvent?: { eventType?: number }; sysEvent?: { eventType?: number } }) => void>,
+  evenHubCallbacks: [] as Array<
+    (event: {
+      listEvent?: { eventType?: number };
+      textEvent?: { eventType?: number };
+      sysEvent?: { eventType?: number };
+    }) => void
+  >,
   bridge: {
     getLocalStorage: vi.fn(),
     setLocalStorage: vi.fn(),
@@ -152,7 +158,7 @@ describe('phone UI shell', () => {
     const watchlistInput = document.querySelector<HTMLInputElement>('#watchlist-symbols');
     const chips = Array.from(document.querySelectorAll<HTMLElement>('[data-role="watchlist-chip"]'));
     const previewRows = Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-row"]'));
-    const previewActivityGauge = document.querySelector<HTMLElement>('[data-role="preview-activity-gauge"]');
+    const previewActivityGauges = Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-activity-gauge"]'));
 
     expect(appTitle?.textContent).toBe('Crypto Hub');
     expect(document.body.textContent).not.toContain('Even G2 Crypto HUD');
@@ -169,7 +175,8 @@ describe('phone UI shell', () => {
     expect(document.querySelector('[data-role="preview-timestamp"]')?.textContent).toBe('');
     expect(previewRows.map((row) => row.textContent)).toEqual(['KEY REQUIRED', 'OPEN PHONE', '', '']);
     expect(document.querySelector('[data-role="preview-activity-score"]')).toBeNull();
-    expect(previewActivityGauge?.textContent).toBe('');
+    expect(previewActivityGauges).toHaveLength(4);
+    expect(previewActivityGauges.map((gauge) => gauge.textContent)).toEqual(['', '', '', '']);
   });
 
   it('restores a saved CoinGecko key from Even App bridge storage after launch', async () => {
@@ -208,7 +215,7 @@ describe('phone UI shell', () => {
     await flushAsyncWork();
 
     const chips = Array.from(document.querySelectorAll<HTMLElement>('[data-role="watchlist-chip"]'));
-    const previewActivityGauge = document.querySelector<HTMLElement>('[data-role="preview-activity-gauge"]');
+    const previewActivityGauges = Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-activity-gauge"]'));
 
     expect(chips.map((chip) => chip.dataset.coinId)).toEqual(['dogecoin', 'cardano']);
     expect(JSON.parse(window.localStorage.getItem('even-crypto:watchlist') ?? '')).toEqual([
@@ -218,7 +225,7 @@ describe('phone UI shell', () => {
     expect(priceState.requestedCoinIds).toContainEqual(['dogecoin', 'cardano']);
     expect(marketActivityState.requests).toBeGreaterThan(0);
     expect(document.querySelector('[data-role="preview-activity-score"]')).toBeNull();
-    expect(previewActivityGauge?.textContent).toBe('QUIET \\---^---/ ACTIVE');
+    expect(previewActivityGauges.map((gauge) => gauge.textContent)).toEqual(['', 'QUIET \\---^---/ ACTIVE', '', '']);
   });
 
   it('keeps watchlist prices visible when market activity data is unavailable', async () => {
@@ -317,6 +324,113 @@ describe('phone UI shell', () => {
       }),
     );
     expect(document.querySelector('[data-role="message"]')?.textContent).toBe('CoinGecko rate limit reached');
+  });
+
+  it('fetches every saved watchlist coin and pages the glasses HUD with scroll gestures', async () => {
+    bridgeState.hasBridge = true;
+    bridgeState.bridge.getLocalStorage.mockImplementation(async (key: string) => {
+      if (key === 'even-crypto:coingecko-api-key') {
+        return 'cg_demo_saved';
+      }
+
+      if (key === 'even-crypto:watchlist') {
+        return JSON.stringify([
+          { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+          { id: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
+          { id: 'solana', symbol: 'SOL', name: 'Solana' },
+          { id: 'ripple', symbol: 'XRP', name: 'XRP' },
+          { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin' },
+          { id: 'cardano', symbol: 'ADA', name: 'Cardano' },
+        ]);
+      }
+
+      return '';
+    });
+
+    await import('./main');
+    await flushAsyncWork();
+
+    const firstPage = bridgeState.bridge.createStartUpPageContainer.mock.calls.at(-1)?.[0];
+    const firstPageTimestamp = firstPage.textObject?.find((container: { containerName?: string }) => {
+      return container.containerName === 'timestamp';
+    });
+    const firstPageRows = firstPage.textObject
+      ?.filter((container: { containerName?: string }) => container.containerName?.startsWith('row'))
+      .map((container: { content?: string }) => container.content);
+
+    expect(priceState.requestedCoinIds).toContainEqual([
+      'bitcoin',
+      'ethereum',
+      'solana',
+      'ripple',
+      'dogecoin',
+      'cardano',
+    ]);
+    expect(firstPageTimestamp?.content).toMatch(/^LAST \d{2}:\d{2} P1\/2$/);
+    expect(firstPageRows).toEqual(['BTC   $62,914.00', 'ETH   $1,676.00', 'SOL    $66.00', 'XRP     $1.16']);
+    expect(document.querySelector<HTMLElement>('[data-role="first-four-note"]')?.hidden).toBe(false);
+    expect(
+      Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-activity-gauge"]')).map(
+        (gauge) => gauge.textContent,
+      ),
+    ).toEqual(['', '', '', 'QUIET \\---^---/ ACTIVE']);
+
+    bridgeState.bridge.textContainerUpgrade.mockClear();
+    bridgeState.bridge.createStartUpPageContainer.mockClear();
+    const requestCount = priceState.requestedCoinIds.length;
+    const marketActivityRequestCount = marketActivityState.requests;
+
+    await bridgeState.evenHubCallbacks[0]({ textEvent: { eventType: 2 } });
+    await flushAsyncWork();
+
+    const secondPage = bridgeState.bridge.createStartUpPageContainer.mock.calls.at(-1)?.[0];
+    const secondPageTimestamp = secondPage.textObject?.find((container: { containerName?: string }) => {
+      return container.containerName === 'timestamp';
+    });
+    const secondPageRows = secondPage.textObject
+      ?.filter((container: { containerName?: string }) => container.containerName?.startsWith('row'))
+      .map((container: { content?: string }) => container.content);
+    const secondPageActivityGauge = secondPage.textObject?.find((container: { containerName?: string }) => {
+      return container.containerName === 'activityGauge';
+    });
+
+    expect(priceState.requestedCoinIds).toHaveLength(requestCount);
+    expect(marketActivityState.requests).toBe(marketActivityRequestCount);
+    expect(bridgeState.bridge.createStartUpPageContainer).toHaveBeenCalledTimes(1);
+    expect(bridgeState.bridge.textContainerUpgrade).not.toHaveBeenCalled();
+    expect(secondPage.containerTotalNum).toBeLessThanOrEqual(8);
+    expect(secondPageTimestamp?.content).toMatch(/^LAST \d{2}:\d{2} P2\/2$/);
+    expect(secondPageRows).toEqual(['DOGE    $1.00', 'ADA     $1.00', '', '']);
+    expect(secondPageActivityGauge).toMatchObject({
+      yPosition: 119,
+      content: 'QUIET \\---^---/ ACTIVE',
+    });
+    expect(Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-row"]')).map((row) => row.textContent)).toEqual([
+      'DOGE    $1.00',
+      'ADA     $1.00',
+      '',
+      '',
+    ]);
+    expect(
+      Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-activity-gauge"]')).map(
+        (gauge) => gauge.textContent,
+      ),
+    ).toEqual(['', 'QUIET \\---^---/ ACTIVE', '', '']);
+
+    bridgeState.bridge.textContainerUpgrade.mockClear();
+    bridgeState.bridge.createStartUpPageContainer.mockClear();
+
+    await bridgeState.evenHubCallbacks[0]({ textEvent: { eventType: 1 } });
+    await flushAsyncWork();
+
+    const firstPageAgain = bridgeState.bridge.createStartUpPageContainer.mock.calls.at(-1)?.[0];
+    const firstPageAgainTimestamp = firstPageAgain.textObject?.find((container: { containerName?: string }) => {
+      return container.containerName === 'timestamp';
+    });
+
+    expect(bridgeState.bridge.createStartUpPageContainer).toHaveBeenCalledTimes(1);
+    expect(bridgeState.bridge.textContainerUpgrade).not.toHaveBeenCalled();
+    expect(firstPageAgainTimestamp?.content).toMatch(/^LAST \d{2}:\d{2} P1\/2$/);
   });
 
   it('registers EvenHub events and opens the system exit dialog on root double-tap', async () => {

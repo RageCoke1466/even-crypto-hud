@@ -7,9 +7,16 @@ export interface HudText {
   activityGauge: string;
 }
 
-export function formatHudSnapshot(snapshot: CryptoWatchlistSnapshot): HudText {
+export interface HudPageContext {
+  currentPage: number;
+  totalPages: number;
+}
+
+export function formatHudSnapshot(snapshot: CryptoWatchlistSnapshot, page?: HudPageContext): HudText {
+  const localTime = formatLocalTime(snapshot.updatedAt);
+
   return {
-    timestamp: `LAST UPDATED ${formatLocalTime(snapshot.updatedAt)}`,
+    timestamp: hasMultiplePages(page) ? `LAST ${localTime} ${formatPageLabel(page)}` : `LAST UPDATED ${localTime}`,
     rows: normalizeRows(snapshot.assets.map((asset) => formatPriceRow(asset.coin.symbol, asset.price))),
     activityGauge: snapshot.marketActivity ? formatActivityGauge(snapshot.marketActivity.score) : '',
   };
@@ -23,12 +30,26 @@ export function formatKeyRequiredHud(): HudText {
   };
 }
 
-export function formatLoadingHud(coins: WatchlistCoin[]): HudText {
+export function formatLoadingHud(coins: WatchlistCoin[], page?: HudPageContext): HudText {
   return {
-    timestamp: '',
+    timestamp: hasMultiplePages(page) ? `PAGE ${page.currentPage + 1}/${page.totalPages}` : '',
     rows: normalizeRows(coins.map((coin) => `${coin.symbol.padEnd(6)}LOADING`)),
     activityGauge: '',
   };
+}
+
+export function getHudActivityRowIndex(text: HudText): number {
+  if (!text.activityGauge) {
+    return -1;
+  }
+
+  for (let index = text.rows.length - 1; index >= 0; index -= 1) {
+    if (text.rows[index].trim()) {
+      return index;
+    }
+  }
+
+  return -1;
 }
 
 function formatActivityGauge(score: number): string {
@@ -70,4 +91,12 @@ function normalizeRows(rows: string[]): HudText['rows'] {
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum);
+}
+
+function hasMultiplePages(page: HudPageContext | undefined): page is HudPageContext {
+  return Boolean(page && page.totalPages > 1);
+}
+
+function formatPageLabel(page: HudPageContext): string {
+  return `P${page.currentPage + 1}/${page.totalPages}`;
 }

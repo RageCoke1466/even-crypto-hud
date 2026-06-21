@@ -2,6 +2,7 @@ import {
   formatHudSnapshot,
   formatKeyRequiredHud,
   formatLoadingHud,
+  type HudPageContext,
   type HudText,
 } from './formatters/priceFormatter';
 import type { CryptoWatchlistSnapshot } from './prices/types';
@@ -25,24 +26,24 @@ export function buildMissingKeyState(): CryptoAppState {
   };
 }
 
-export function buildSnapshotState(snapshot: CryptoWatchlistSnapshot): CryptoAppState {
+export function buildSnapshotState(snapshot: CryptoWatchlistSnapshot, page?: HudPageContext): CryptoAppState {
   const symbols = snapshot.assets.map((asset) => asset.coin.symbol).join(', ');
 
   return {
     status: 'ready',
     message: `${symbols} updated from CoinGecko.`,
-    hudText: formatHudSnapshot(snapshot),
+    hudText: formatHudSnapshot(snapshot, page),
     shouldFetch: true,
   };
 }
 
-export function buildLoadingState(coins: WatchlistCoin[]): CryptoAppState {
+export function buildLoadingState(coins: WatchlistCoin[], page?: HudPageContext): CryptoAppState {
   const symbols = coins.map((coin) => coin.symbol).join(', ');
 
   return {
     status: 'loading',
     message: `Fetching ${symbols} from CoinGecko...`,
-    hudText: formatLoadingHud(coins),
+    hudText: formatLoadingHud(coins, page),
     shouldFetch: true,
   };
 }
