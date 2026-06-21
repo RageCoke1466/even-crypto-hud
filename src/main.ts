@@ -10,7 +10,7 @@ import {
 } from './app';
 import { connectEvenBridge, hasEvenHostBridge } from './even/bridge';
 import { createCryptoHudPage, getCryptoHudLayoutKey, updateCryptoHudPage } from './even/cryptoPage';
-import { getHudActivityRowIndex, type HudPageContext, type HudText } from './formatters/priceFormatter';
+import { type HudPageContext, type HudText } from './formatters/priceFormatter';
 import { CoinGeckoMarketActivitySource } from './market/coinGeckoMarketActivitySource';
 import type { MarketActivitySnapshot } from './market/types';
 import { CoinGeckoCoinCatalogSource } from './prices/coinCatalogSource';
@@ -517,7 +517,6 @@ async function syncGlasses(hudText: HudText): Promise<void> {
   const nextHudLayoutKey = getCryptoHudLayoutKey(hudText);
 
   if (!evenBridge) {
-    renderPreview(hudText);
     return;
   }
 
@@ -526,29 +525,14 @@ async function syncGlasses(hudText: HudText): Promise<void> {
     glassesPageCreated = result === 0;
     currentHudLayoutKey = glassesPageCreated ? nextHudLayoutKey : null;
     updateBridgeStatus(glassesPageCreated ? 'Glasses HUD created.' : `Glasses HUD create failed: ${result}`);
-    renderPreview(hudText);
     return;
   }
 
   await updateCryptoHudPage(evenBridge, hudText);
-  renderPreview(hudText);
 }
 
 function renderState(state: CryptoAppState): void {
   elements.message.textContent = state.message;
-  renderPreview(state.hudText);
-}
-
-function renderPreview(hudText: HudText): void {
-  elements.previewTimestamp.textContent = hudText.timestamp;
-  elements.previewRows.forEach((row, index) => {
-    row.textContent = hudText.rows[index];
-  });
-
-  const activityGaugeRowIndex = getHudActivityRowIndex(hudText);
-  elements.previewActivityGauges.forEach((gauge, index) => {
-    gauge.textContent = index === activityGaugeRowIndex ? hudText.activityGauge : '';
-  });
 }
 
 function updateBridgeStatus(message: string): void {
@@ -711,27 +695,29 @@ function renderShell(container: HTMLElement) {
         <p class="message" data-role="message"></p>
       </div>
 
-      <section class="preview-area" aria-label="Glasses preview">
+      <section class="preview-area" aria-label="Glasses layout guide">
         <div class="screen">
-          <div class="hud-card">
-            <div class="hud-timestamp" data-role="preview-timestamp"></div>
-            <div class="hud-rows" aria-label="Watchlist preview rows">
-              <div class="hud-line">
-                <div class="hud-row" data-role="preview-row">KEY REQUIRED</div>
-                <div class="hud-activity-gauge" data-role="preview-activity-gauge"></div>
+          <div class="hud-card hud-guide">
+            <div class="hud-guide-region hud-guide-watchlist" data-role="preview-watchlist-region">
+              <span class="hud-guide-kicker">Left</span>
+              <span class="hud-guide-title">Watchlist</span>
+              <span class="hud-guide-detail">Selected coins and prices</span>
+              <div class="hud-guide-list" aria-hidden="true">
+                <span>BTC</span>
+                <span>ETH</span>
+                <span>SOL</span>
+                <span>IP</span>
               </div>
-              <div class="hud-line">
-                <div class="hud-row" data-role="preview-row">OPEN PHONE</div>
-                <div class="hud-activity-gauge" data-role="preview-activity-gauge"></div>
-              </div>
-              <div class="hud-line">
-                <div class="hud-row" data-role="preview-row"></div>
-                <div class="hud-activity-gauge" data-role="preview-activity-gauge"></div>
-              </div>
-              <div class="hud-line">
-                <div class="hud-row" data-role="preview-row"></div>
-                <div class="hud-activity-gauge" data-role="preview-activity-gauge"></div>
-              </div>
+            </div>
+            <div class="hud-guide-region hud-guide-status" data-role="preview-status-region">
+              <span class="hud-guide-kicker">Upper right</span>
+              <span class="hud-guide-title">Live status</span>
+              <span class="hud-guide-detail">Last update and page</span>
+            </div>
+            <div class="hud-guide-region hud-guide-momentum" data-role="preview-momentum-region">
+              <span class="hud-guide-kicker">Lower right</span>
+              <span class="hud-guide-title">Market momentum</span>
+              <span class="hud-guide-detail">Quiet to active</span>
             </div>
           </div>
         </div>
@@ -749,9 +735,9 @@ function renderShell(container: HTMLElement) {
   const firstFourNote = container.querySelector<HTMLElement>('[data-role="first-four-note"]');
   const bridgeStatus = container.querySelector<HTMLElement>('[data-role="bridge"]');
   const message = container.querySelector<HTMLElement>('[data-role="message"]');
-  const previewTimestamp = container.querySelector<HTMLElement>('[data-role="preview-timestamp"]');
-  const previewRows = Array.from(container.querySelectorAll<HTMLElement>('[data-role="preview-row"]'));
-  const previewActivityGauges = Array.from(container.querySelectorAll<HTMLElement>('[data-role="preview-activity-gauge"]'));
+  const previewWatchlistRegion = container.querySelector<HTMLElement>('[data-role="preview-watchlist-region"]');
+  const previewStatusRegion = container.querySelector<HTMLElement>('[data-role="preview-status-region"]');
+  const previewMomentumRegion = container.querySelector<HTMLElement>('[data-role="preview-momentum-region"]');
 
   if (
     !apiKeyInput ||
@@ -763,9 +749,9 @@ function renderShell(container: HTMLElement) {
     !watchlistList ||
     !firstFourNote ||
     !message ||
-    !previewTimestamp ||
-    previewRows.length !== 4 ||
-    previewActivityGauges.length !== 4
+    !previewWatchlistRegion ||
+    !previewStatusRegion ||
+    !previewMomentumRegion
   ) {
     throw new Error('Failed to render app shell');
   }
@@ -786,8 +772,8 @@ function renderShell(container: HTMLElement) {
     firstFourNote,
     bridgeStatus,
     message,
-    previewTimestamp,
-    previewRows,
-    previewActivityGauges,
+    previewWatchlistRegion,
+    previewStatusRegion,
+    previewMomentumRegion,
   };
 }
