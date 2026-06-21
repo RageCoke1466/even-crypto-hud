@@ -39,6 +39,14 @@ describe('formatHudSnapshot', () => {
       ],
       updatedAt,
       provider: 'coingecko',
+      marketActivity: {
+        score: 50,
+        volumeActivityScore: 40,
+        volatilityActivityScore: 60,
+        trendingActivityScore: 50,
+        updatedAt,
+        provider: 'coingecko',
+      },
     };
     const localTime = new Intl.DateTimeFormat('en-US', {
       hour: '2-digit',
@@ -51,7 +59,9 @@ describe('formatHudSnapshot', () => {
     expect(formatted).toEqual({
       timestamp: `LAST UPDATED ${localTime}`,
       rows: ['BTC   $67,412.42', 'ETH   $3,540.12', 'SOL   $172.40', 'XRP     $2.41'],
+      activityGauge: 'QUIET \\---^---/ ACTIVE',
     });
+    expect(formatted).not.toHaveProperty('activityScore');
     expect([formatted.timestamp, ...formatted.rows].join(' ')).not.toContain('24h');
   });
 
@@ -86,12 +96,43 @@ describe('formatHudSnapshot', () => {
       provider: 'coingecko',
     };
 
-    expect(formatHudSnapshot(snapshot).rows).toEqual([
-      'DOGE  $0.12345679',
-      'ADA   $0.5000',
-      'SHIB  $0.00001235',
-      '',
-    ]);
+    expect(formatHudSnapshot(snapshot)).toMatchObject({
+      rows: ['DOGE  $0.12345679', 'ADA   $0.5000', 'SHIB  $0.00001235', ''],
+      activityGauge: '',
+    });
+  });
+
+  it('maps high activity scores toward ACTIVE', () => {
+    const updatedAt = new Date('2026-06-07T21:32:00.000Z');
+    const snapshot: CryptoWatchlistSnapshot = {
+      quoteSymbol: 'USD',
+      assets: [
+        {
+          coin: { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+          quoteSymbol: 'USD',
+          price: 67412.42,
+          updatedAt,
+          provider: 'coingecko',
+        },
+      ],
+      updatedAt,
+      provider: 'coingecko',
+      marketActivity: {
+        score: 88,
+        volumeActivityScore: 90,
+        volatilityActivityScore: 85,
+        trendingActivityScore: 88,
+        updatedAt,
+        provider: 'coingecko',
+      },
+    };
+
+    const formatted = formatHudSnapshot(snapshot);
+
+    expect(formatted).toMatchObject({
+      activityGauge: 'QUIET \\-----^-/ ACTIVE',
+    });
+    expect(formatted).not.toHaveProperty('activityScore');
   });
 });
 
@@ -100,6 +141,7 @@ describe('formatKeyRequiredHud', () => {
     expect(formatKeyRequiredHud()).toEqual({
       timestamp: '',
       rows: ['KEY REQUIRED', 'OPEN PHONE', '', ''],
+      activityGauge: '',
     });
   });
 });
@@ -114,6 +156,7 @@ describe('formatLoadingHud', () => {
     ).toEqual({
       timestamp: '',
       rows: ['BTC   LOADING', 'ETH   LOADING', '', ''],
+      activityGauge: '',
     });
   });
 });

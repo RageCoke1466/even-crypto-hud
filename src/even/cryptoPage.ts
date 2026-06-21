@@ -13,13 +13,15 @@ const CONTAINERS = {
   row2: { id: 4, name: 'row2' },
   row3: { id: 5, name: 'row3' },
   row4: { id: 6, name: 'row4' },
+  activityGauge: { id: 7, name: 'activityGauge' },
 } as const;
 const TIMESTAMP_UPDATE_LENGTH = 18;
 const ROW_UPDATE_LENGTH = 32;
+const ACTIVITY_GAUGE_UPDATE_LENGTH = 24;
 
 export function buildCryptoHudPage(text: HudText): CreateStartUpPageContainer {
   return new CreateStartUpPageContainer({
-    containerTotalNum: 6,
+    containerTotalNum: 7,
     textObject: [
       new TextContainerProperty({
         xPosition: 22,
@@ -53,6 +55,20 @@ export function buildCryptoHudPage(text: HudText): CreateStartUpPageContainer {
       buildRowContainer(CONTAINERS.row2.id, CONTAINERS.row2.name, 124, text.rows[1]),
       buildRowContainer(CONTAINERS.row3.id, CONTAINERS.row3.name, 166, text.rows[2]),
       buildRowContainer(CONTAINERS.row4.id, CONTAINERS.row4.name, 208, text.rows[3]),
+      new TextContainerProperty({
+        xPosition: 300,
+        yPosition: 208,
+        width: 228,
+        height: 38,
+        borderWidth: 0,
+        borderColor: 0,
+        borderRadius: 0,
+        paddingLength: 0,
+        containerID: CONTAINERS.activityGauge.id,
+        containerName: CONTAINERS.activityGauge.name,
+        content: text.activityGauge,
+        isEventCapture: 0,
+      }),
     ],
   });
 }
@@ -64,6 +80,12 @@ export function buildCryptoHudUpdates(text: HudText): TextContainerUpgrade[] {
     buildTextUpdate(CONTAINERS.row2.id, CONTAINERS.row2.name, text.rows[1], ROW_UPDATE_LENGTH),
     buildTextUpdate(CONTAINERS.row3.id, CONTAINERS.row3.name, text.rows[2], ROW_UPDATE_LENGTH),
     buildTextUpdate(CONTAINERS.row4.id, CONTAINERS.row4.name, text.rows[3], ROW_UPDATE_LENGTH),
+    buildTextUpdate(
+      CONTAINERS.activityGauge.id,
+      CONTAINERS.activityGauge.name,
+      text.activityGauge,
+      ACTIVITY_GAUGE_UPDATE_LENGTH,
+    ),
   ];
 }
 

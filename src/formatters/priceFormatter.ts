@@ -4,12 +4,14 @@ import type { WatchlistCoin } from '../settings/watchlistStore';
 export interface HudText {
   timestamp: string;
   rows: [string, string, string, string];
+  activityGauge: string;
 }
 
 export function formatHudSnapshot(snapshot: CryptoWatchlistSnapshot): HudText {
   return {
     timestamp: `LAST UPDATED ${formatLocalTime(snapshot.updatedAt)}`,
     rows: normalizeRows(snapshot.assets.map((asset) => formatPriceRow(asset.coin.symbol, asset.price))),
+    activityGauge: snapshot.marketActivity ? formatActivityGauge(snapshot.marketActivity.score) : '',
   };
 }
 
@@ -17,6 +19,7 @@ export function formatKeyRequiredHud(): HudText {
   return {
     timestamp: '',
     rows: ['KEY REQUIRED', 'OPEN PHONE', '', ''],
+    activityGauge: '',
   };
 }
 
@@ -24,7 +27,16 @@ export function formatLoadingHud(coins: WatchlistCoin[]): HudText {
   return {
     timestamp: '',
     rows: normalizeRows(coins.map((coin) => `${coin.symbol.padEnd(6)}LOADING`)),
+    activityGauge: '',
   };
+}
+
+function formatActivityGauge(score: number): string {
+  const tickCount = 7;
+  const pointerIndex = Math.round((clamp(score, 0, 100) / 100) * (tickCount - 1));
+  const ticks = Array.from({ length: tickCount }, (_, index) => (index === pointerIndex ? '^' : '-')).join('');
+
+  return `QUIET \\${ticks}/ ACTIVE`;
 }
 
 function formatUsd(value: number): string {
@@ -54,4 +66,8 @@ function formatPriceRow(symbol: string, price: number): string {
 
 function normalizeRows(rows: string[]): HudText['rows'] {
   return [rows[0] ?? '', rows[1] ?? '', rows[2] ?? '', rows[3] ?? ''];
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(Math.max(value, minimum), maximum);
 }

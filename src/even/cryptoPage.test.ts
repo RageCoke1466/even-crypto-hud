@@ -9,14 +9,15 @@ const hudText = {
     string,
     string,
   ],
+  activityGauge: 'QUIET \\---^---/ ACTIVE',
 };
 
 describe('buildCryptoHudPage', () => {
   it('creates a watchlist card with one border, a top-right timestamp, and four row containers', () => {
     const page = buildCryptoHudPage(hudText);
 
-    expect(page.containerTotalNum).toBe(6);
-    expect(page.textObject).toHaveLength(6);
+    expect(page.containerTotalNum).toBe(7);
+    expect(page.textObject).toHaveLength(7);
     expect(page.textObject?.map((container) => container.containerName)).toEqual([
       'card',
       'timestamp',
@@ -24,12 +25,14 @@ describe('buildCryptoHudPage', () => {
       'row2',
       'row3',
       'row4',
+      'activityGauge',
     ]);
 
     const card = page.textObject?.find((container) => container.containerName === 'card');
     const timestamp = page.textObject?.find((container) => container.containerName === 'timestamp');
     const row1 = page.textObject?.find((container) => container.containerName === 'row1');
     const row4 = page.textObject?.find((container) => container.containerName === 'row4');
+    const activityGauge = page.textObject?.find((container) => container.containerName === 'activityGauge');
 
     expect(card).toMatchObject({
       xPosition: 22,
@@ -65,6 +68,14 @@ describe('buildCryptoHudPage', () => {
       height: 38,
       content: 'XRP     $2.41',
     });
+    expect(activityGauge).toMatchObject({
+      containerID: 7,
+      xPosition: 300,
+      yPosition: 208,
+      width: 228,
+      height: 38,
+      content: 'QUIET \\---^---/ ACTIVE',
+    });
     expect(page.textObject?.map((container) => container.content).join(' ')).not.toContain('24h');
   });
 
@@ -85,7 +96,7 @@ describe('buildCryptoHudUpdates', () => {
   it('builds in-place text updates for the timestamp and four rows', () => {
     const updates = buildCryptoHudUpdates(hudText);
 
-    expect(updates).toHaveLength(5);
+    expect(updates).toHaveLength(6);
     expect(updates).toEqual([
       {
         containerID: 2,
@@ -122,6 +133,13 @@ describe('buildCryptoHudUpdates', () => {
         contentLength: 32,
         content: 'XRP     $2.41'.padEnd(32, ' '),
       },
+      {
+        containerID: 7,
+        containerName: 'activityGauge',
+        contentOffset: 0,
+        contentLength: 24,
+        content: 'QUIET \\---^---/ ACTIVE'.padEnd(24, ' '),
+      },
     ]);
   });
 
@@ -129,11 +147,13 @@ describe('buildCryptoHudUpdates', () => {
     const updates = buildCryptoHudUpdates({
       timestamp: '',
       rows: ['BTC   $67,412', 'ETH    $3,540', '', ''] as [string, string, string, string],
+      activityGauge: '',
     });
 
     const timestamp = updates.find((update) => update.containerName === 'timestamp');
     const row3 = updates.find((update) => update.containerName === 'row3');
     const row4 = updates.find((update) => update.containerName === 'row4');
+    const activityGauge = updates.find((update) => update.containerName === 'activityGauge');
 
     expect(timestamp).toMatchObject({
       contentLength: 18,
@@ -146,6 +166,10 @@ describe('buildCryptoHudUpdates', () => {
     expect(row4).toMatchObject({
       contentLength: 32,
       content: '                                ',
+    });
+    expect(activityGauge).toMatchObject({
+      contentLength: 24,
+      content: '                        ',
     });
   });
 });

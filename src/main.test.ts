@@ -20,6 +20,11 @@ const priceState = vi.hoisted(() => ({
   nextError: null as Error | null,
 }));
 
+const marketActivityState = vi.hoisted(() => ({
+  requests: 0,
+  nextError: null as Error | null,
+}));
+
 vi.mock('./even/bridge', () => ({
   hasEvenHostBridge: () => bridgeState.hasBridge,
   connectEvenBridge: vi.fn(async () => bridgeState.bridge),
@@ -72,6 +77,29 @@ vi.mock('./prices/coingeckoPriceSource', () => ({
   },
 }));
 
+vi.mock('./market/coinGeckoMarketActivitySource', () => ({
+  CoinGeckoMarketActivitySource: class {
+    async getLatest() {
+      marketActivityState.requests += 1;
+
+      if (marketActivityState.nextError) {
+        const error = marketActivityState.nextError;
+        marketActivityState.nextError = null;
+        throw error;
+      }
+
+      return {
+        score: 50,
+        volumeActivityScore: 40,
+        volatilityActivityScore: 60,
+        trendingActivityScore: 50,
+        updatedAt: new Date('2026-06-07T22:58:00.000Z'),
+        provider: 'coingecko',
+      };
+    }
+  },
+}));
+
 async function flushAsyncWork(): Promise<void> {
   await new Promise((resolve) => window.setTimeout(resolve, 0));
   await Promise.resolve();
@@ -98,6 +126,8 @@ describe('phone UI shell', () => {
     priceState.requestedApiKeys = [];
     priceState.requestedCoinIds = [];
     priceState.nextError = null;
+    marketActivityState.requests = 0;
+    marketActivityState.nextError = null;
 
     const storage = new Map<string, string>();
     Object.defineProperty(window, 'localStorage', {
@@ -122,12 +152,15 @@ describe('phone UI shell', () => {
     const watchlistInput = document.querySelector<HTMLInputElement>('#watchlist-symbols');
     const chips = Array.from(document.querySelectorAll<HTMLElement>('[data-role="watchlist-chip"]'));
     const previewRows = Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-row"]'));
+    const previewActivityGauge = document.querySelector<HTMLElement>('[data-role="preview-activity-gauge"]');
 
     expect(appTitle?.textContent).toBe('Crypto Hub');
     expect(document.body.textContent).not.toContain('Even G2 Crypto HUD');
     expect(document.body.textContent).not.toContain('Crypto watchlist, one glance.');
     expect(document.querySelector('a[href="https://docs.coingecko.com/docs/setting-up-your-api-key"]')).toBeNull();
     expect(document.querySelector('a[href="https://www.coingecko.com/en/api"]')).toBeNull();
+    expect(document.body.textContent).toContain('Market activity by CoinGecko');
+    expect(document.body.textContent).not.toContain('Data provided by CoinGecko');
     expect(coinSearchInput?.placeholder).toBe('Search by symbol, name, or id');
     expect(refreshWatchlistButton?.textContent).toBe('Refresh watchlist');
     expect(refreshNowButton).toBeNull();
@@ -135,6 +168,8 @@ describe('phone UI shell', () => {
     expect(chips.map((chip) => chip.dataset.coinId)).toEqual([]);
     expect(document.querySelector('[data-role="preview-timestamp"]')?.textContent).toBe('');
     expect(previewRows.map((row) => row.textContent)).toEqual(['KEY REQUIRED', 'OPEN PHONE', '', '']);
+    expect(document.querySelector('[data-role="preview-activity-score"]')).toBeNull();
+    expect(previewActivityGauge?.textContent).toBe('');
   });
 
   it('restores a saved CoinGecko key from Even App bridge storage after launch', async () => {
@@ -173,6 +208,7 @@ describe('phone UI shell', () => {
     await flushAsyncWork();
 
     const chips = Array.from(document.querySelectorAll<HTMLElement>('[data-role="watchlist-chip"]'));
+    const previewActivityGauge = document.querySelector<HTMLElement>('[data-role="preview-activity-gauge"]');
 
     expect(chips.map((chip) => chip.dataset.coinId)).toEqual(['dogecoin', 'cardano']);
     expect(JSON.parse(window.localStorage.getItem('even-crypto:watchlist') ?? '')).toEqual([
@@ -180,6 +216,35 @@ describe('phone UI shell', () => {
       { id: 'cardano', symbol: 'ADA', name: 'Cardano' },
     ]);
     expect(priceState.requestedCoinIds).toContainEqual(['dogecoin', 'cardano']);
+    expect(marketActivityState.requests).toBeGreaterThan(0);
+    expect(document.querySelector('[data-role="preview-activity-score"]')).toBeNull();
+    expect(previewActivityGauge?.textContent).toBe('QUIET \\---^---/ ACTIVE');
+  });
+
+  it('keeps watchlist prices visible when market activity data is unavailable', async () => {
+    bridgeState.hasBridge = true;
+    marketActivityState.nextError = new Error('CoinGecko market activity rate limit reached');
+    bridgeState.bridge.getLocalStorage.mockImplementation(async (key: string) => {
+      if (key === 'even-crypto:coingecko-api-key') {
+        return 'cg_demo_saved';
+      }
+
+      if (key === 'even-crypto:watchlist') {
+        return JSON.stringify([{ id: 'bitcoin', symbol: 'btc', name: 'Bitcoin' }]);
+      }
+
+      return '';
+    });
+
+    await import('./main');
+    await flushAsyncWork();
+
+    const previewRows = Array.from(document.querySelectorAll<HTMLElement>('[data-role="preview-row"]'));
+
+    expect(priceState.requestedCoinIds).toContainEqual(['bitcoin']);
+    expect(marketActivityState.requests).toBeGreaterThan(0);
+    expect(previewRows.map((row) => row.textContent)).toEqual(['BTC   $62,914.00', '', '', '']);
+    expect(document.querySelector('[data-role="message"]')?.textContent).toBe('BTC updated from CoinGecko.');
   });
 
   it('refreshes watchlist controls from Even App bridge storage on request', async () => {

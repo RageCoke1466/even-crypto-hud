@@ -17,6 +17,7 @@ describe('app state helpers', () => {
       hudText: {
         timestamp: '',
         rows: ['KEY REQUIRED', 'OPEN PHONE', '', ''],
+        activityGauge: '',
       },
       shouldFetch: false,
     });
@@ -29,6 +30,7 @@ describe('app state helpers', () => {
       hudText: {
         timestamp: '',
         rows: ['BTC   LOADING', 'ETH   LOADING', '', ''],
+        activityGauge: '',
       },
       shouldFetch: true,
     });
@@ -41,6 +43,7 @@ describe('app state helpers', () => {
       hudText: {
         timestamp: '',
         rows: ['', '', '', ''],
+        activityGauge: '',
       },
       shouldFetch: false,
     });
@@ -87,6 +90,14 @@ describe('app state helpers', () => {
       ],
       updatedAt,
       provider: 'coingecko',
+      marketActivity: {
+        score: 22,
+        volumeActivityScore: 20,
+        volatilityActivityScore: 26,
+        trendingActivityScore: 18,
+        updatedAt,
+        provider: 'coingecko',
+      },
     });
 
     expect(state).toEqual({
@@ -95,6 +106,7 @@ describe('app state helpers', () => {
       hudText: {
         timestamp: `LAST UPDATED ${localTime}`,
         rows: ['BTC   $67,412.42', 'ETH   $3,540.12', 'SOL   $172.40', 'XRP     $2.41'],
+        activityGauge: 'QUIET \\-^-----/ ACTIVE',
       },
       shouldFetch: true,
     });
