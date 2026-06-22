@@ -193,6 +193,43 @@ describe('phone UI shell', () => {
     );
   });
 
+  it('replaces the key-required glasses HUD with loading rows when a key is saved', async () => {
+    bridgeState.hasBridge = true;
+    bridgeState.bridge.getLocalStorage.mockImplementation(async (key: string) => {
+      if (key === 'even-crypto:watchlist') {
+        return JSON.stringify([{ id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' }]);
+      }
+
+      return '';
+    });
+
+    await import('./main');
+    await flushAsyncWork();
+
+    const initialPage = bridgeState.bridge.createStartUpPageContainer.mock.calls.at(-1)?.[0];
+    const initialRows = initialPage.textObject
+      ?.filter((container: { containerName?: string }) => container.containerName?.startsWith('row'))
+      .map((container: { content?: string }) => container.content);
+
+    expect(initialRows).toEqual(['KEY REQUIRED', 'OPEN PHONE', '', '']);
+
+    bridgeState.bridge.textContainerUpgrade.mockClear();
+    priceState.nextError = new Error('CoinGecko rate limit reached');
+    const apiKeyInput = document.querySelector<HTMLInputElement>('#coingecko-key');
+    const form = document.querySelector<HTMLFormElement>('.key-form');
+
+    apiKeyInput!.value = 'cg_demo_saved';
+    form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flushAsyncWork();
+
+    const row1Update = bridgeState.bridge.textContainerUpgrade.mock.calls
+      .map((call) => call[0])
+      .find((update) => update.containerName === 'row1');
+
+    expect(row1Update?.content).toContain('BTC   LOADING');
+    expect(document.querySelector('[data-role="message"]')?.textContent).toBe('CoinGecko rate limit reached');
+  });
+
   it('restores a saved watchlist from Even App bridge storage after launch', async () => {
     bridgeState.hasBridge = true;
     bridgeState.bridge.getLocalStorage.mockImplementation(async (key: string) => {
@@ -247,10 +284,15 @@ describe('phone UI shell', () => {
     const firstPageRows = firstPage.textObject
       ?.filter((container: { containerName?: string }) => container.containerName?.startsWith('row'))
       .map((container: { content?: string }) => container.content);
+    const row1Update = bridgeState.bridge.textContainerUpgrade.mock.calls
+      .map((call) => call[0])
+      .filter((update) => update.containerName === 'row1')
+      .at(-1);
 
     expect(priceState.requestedCoinIds).toContainEqual(['bitcoin']);
     expect(marketActivityState.requests).toBeGreaterThan(0);
-    expect(firstPageRows).toEqual(['BTC   $62,914.00', '', '', '']);
+    expect(firstPageRows).toEqual(['BTC   LOADING', '', '', '']);
+    expect(row1Update?.content).toContain('BTC   $62,914.00');
     expect(document.querySelector('[data-role="message"]')?.textContent).toBe('BTC updated from CoinGecko.');
   });
 

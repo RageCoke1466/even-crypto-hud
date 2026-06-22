@@ -94,7 +94,7 @@ function bindEvents(): void {
     keyStore.save(apiKey);
     void persistApiKeyToBridgeStorage(apiKey);
     void loadCoinCatalogInBackground();
-    void refreshPrice();
+    void refreshPrice({ syncLoadingToGlasses: true });
   });
 
   elements.clearButton.addEventListener('click', () => {
@@ -292,7 +292,7 @@ async function restoreApiKeyFromBridgeStorage(): Promise<boolean> {
       elements.apiKeyInput.value = bridgeApiKey;
       logInfo('API key restored from Even storage');
       await loadCoinCatalogInBackground();
-      await refreshPrice();
+      await refreshPrice({ syncLoadingToGlasses: true });
       return true;
     }
 
