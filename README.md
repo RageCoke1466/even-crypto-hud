@@ -14,7 +14,7 @@ It does not trade, place orders, or connect to wallets.
 
 | Phone app | Glasses HUD |
 | --- | --- |
-| <img src="assets/screenshots/v0.1.10/inapp.png" alt="Crypto Hub phone app screen" width="320"> | <img src="assets/screenshots/v0.2.5/glasses.png" alt="Crypto Hub glasses HUD screen" width="420"> |
+| <img src="assets/screenshots/v0.2.5/inapp.png" alt="Crypto Hub phone app screen" width="320"> | <img src="assets/screenshots/v0.2.5/glasses.png" alt="Crypto Hub glasses HUD screen" width="420"> |
 
 ## What It Does
 
