@@ -9,7 +9,7 @@ import {
   type CryptoAppState,
 } from './app';
 import { connectEvenBridge, hasEvenHostBridge } from './even/bridge';
-import { createCryptoHudPage, getCryptoHudLayoutKey, updateCryptoHudPage } from './even/cryptoPage';
+import { createCryptoHudPage, getCryptoHudLayoutKey, rebuildCryptoHudPage, updateCryptoHudPage } from './even/cryptoPage';
 import { type HudPageContext, type HudText } from './formatters/priceFormatter';
 import { CoinGeckoMarketActivitySource } from './market/coinGeckoMarketActivitySource';
 import type { MarketActivitySnapshot } from './market/types';
@@ -94,7 +94,7 @@ function bindEvents(): void {
     keyStore.save(apiKey);
     void persistApiKeyToBridgeStorage(apiKey);
     void loadCoinCatalogInBackground();
-    void refreshPrice();
+    void refreshPrice({ syncLoadingToGlasses: true });
   });
 
   elements.clearButton.addEventListener('click', () => {
@@ -145,19 +145,22 @@ function bindEvents(): void {
 
     if (action === 'remove-coin') {
       saveWatchlist(removeWatchlistCoin(watchlist, button.dataset.coinId));
+      renderWatchlistControls();
+      renderCoinSearchResults();
+      void refreshPrice({ syncLoadingToGlasses: true });
+      return;
     }
 
-    if (action === 'move-coin-up') {
-      saveWatchlist(moveWatchlistCoin(watchlist, button.dataset.coinId, 'up'));
+    if (action === 'move-coin-up' || action === 'move-coin-down') {
+      saveWatchlist(
+        moveWatchlistCoin(watchlist, button.dataset.coinId, action === 'move-coin-up' ? 'up' : 'down'),
+      );
+      renderWatchlistControls();
+      renderCoinSearchResults();
+      const state = buildCurrentWatchlistPageState();
+      renderState(state);
+      void syncGlasses(state.hudText);
     }
-
-    if (action === 'move-coin-down') {
-      saveWatchlist(moveWatchlistCoin(watchlist, button.dataset.coinId, 'down'));
-    }
-
-    renderWatchlistControls();
-    renderCoinSearchResults();
-    void refreshPrice({ syncLoadingToGlasses: true });
   });
 }
 
@@ -520,11 +523,32 @@ async function syncGlasses(hudText: HudText): Promise<void> {
     return;
   }
 
-  if (!glassesPageCreated || currentHudLayoutKey !== nextHudLayoutKey) {
+  if (!glassesPageCreated) {
     const result = await createCryptoHudPage(evenBridge, hudText);
     glassesPageCreated = result === 0;
     currentHudLayoutKey = glassesPageCreated ? nextHudLayoutKey : null;
     updateBridgeStatus(glassesPageCreated ? 'Glasses HUD created.' : `Glasses HUD create failed: ${result}`);
+
+    if (!glassesPageCreated) {
+      const rebuilt = await rebuildCryptoHudPage(evenBridge, hudText);
+      glassesPageCreated = rebuilt;
+      currentHudLayoutKey = rebuilt ? nextHudLayoutKey : null;
+      updateBridgeStatus(rebuilt ? 'Glasses HUD rebuilt.' : `Glasses HUD create failed: ${result}`);
+    }
+
+    if (glassesPageCreated) {
+      await updateCryptoHudPage(evenBridge, hudText);
+    }
+    return;
+  }
+
+  if (currentHudLayoutKey !== nextHudLayoutKey) {
+    const rebuilt = await rebuildCryptoHudPage(evenBridge, hudText);
+    currentHudLayoutKey = rebuilt ? nextHudLayoutKey : currentHudLayoutKey;
+    updateBridgeStatus(rebuilt ? 'Glasses HUD rebuilt.' : 'Glasses HUD rebuild failed.');
+    if (rebuilt) {
+      await updateCryptoHudPage(evenBridge, hudText);
+    }
     return;
   }
 
@@ -599,9 +623,20 @@ function getCurrentWatchlistPage(watchlist = watchlistStore.load()): WatchlistCo
 }
 
 function getCurrentSnapshotPage(snapshot: CryptoWatchlistSnapshot): CryptoWatchlistSnapshot {
+  const assetsByCoinId = new Map(snapshot.assets.map((asset) => [asset.coin.id, asset]));
+  const orderedAssets: CryptoWatchlistSnapshot['assets'] = [];
+
+  for (const coin of watchlistStore.load()) {
+    const asset = assetsByCoinId.get(coin.id);
+
+    if (asset) {
+      orderedAssets.push(asset);
+    }
+  }
+
   return {
     ...snapshot,
-    assets: getWatchlistPage(snapshot.assets, currentWatchlistPageIndex),
+    assets: getWatchlistPage(orderedAssets, currentWatchlistPageIndex),
   };
 }
 

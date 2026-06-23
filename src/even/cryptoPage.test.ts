@@ -81,7 +81,7 @@ describe('buildCryptoHudPage', () => {
     expect(page.textObject?.map((container) => container.content).join(' ')).not.toContain('24h');
   });
 
-  it('places the activity gauge beside the last populated token row on short pages', () => {
+  it('keeps the activity gauge in the lower-right slot on short pages', () => {
     const page = buildCryptoHudPage({
       timestamp: 'LAST UPDATED 14:32',
       rows: ['DOGE    $1.00', 'ADA     $1.00', '', ''],
@@ -89,9 +89,26 @@ describe('buildCryptoHudPage', () => {
     });
 
     expect(page.textObject?.find((container) => container.containerName === 'activityGauge')).toMatchObject({
-      yPosition: 119,
+      yPosition: 193,
       content: 'QUIET \\---^---/ ACTIVE',
     });
+  });
+
+  it('keeps the activity gauge in the lower-right slot on single-token pages', () => {
+    const page = buildCryptoHudPage({
+      timestamp: 'LAST 14:32 P2/2',
+      rows: ['DOGE    $1.00', '', '', ''],
+      activityGauge: 'QUIET \\---^---/ ACTIVE',
+    });
+
+    const timestamp = page.textObject?.find((container) => container.containerName === 'timestamp');
+    const activityGauge = page.textObject?.find((container) => container.containerName === 'activityGauge');
+
+    expect(activityGauge).toMatchObject({
+      yPosition: 193,
+      content: 'QUIET \\---^---/ ACTIVE',
+    });
+    expect(activityGauge?.yPosition).not.toBe(timestamp?.yPosition);
   });
 
   it('uses the root card as the only event capture container', () => {
@@ -205,14 +222,21 @@ describe('buildCryptoHudUpdates', () => {
 });
 
 describe('getCryptoHudLayoutKey', () => {
-  it('changes when the market activity gauge needs to move to a different row', () => {
-    expect(getCryptoHudLayoutKey(hudText)).toBe('activity-row:3');
+  it('uses a stable layout key across watchlist pages', () => {
+    expect(getCryptoHudLayoutKey(hudText)).toBe('fixed-layout');
     expect(
       getCryptoHudLayoutKey({
         timestamp: 'LAST UPDATED 14:32',
         rows: ['DOGE    $1.00', 'ADA     $1.00', '', ''],
         activityGauge: 'QUIET \\---^---/ ACTIVE',
       }),
-    ).toBe('activity-row:1');
+    ).toBe('fixed-layout');
+    expect(
+      getCryptoHudLayoutKey({
+        timestamp: 'LAST 14:32 P2/2',
+        rows: ['DOGE    $1.00', '', '', ''],
+        activityGauge: 'QUIET \\---^---/ ACTIVE',
+      }),
+    ).toBe('fixed-layout');
   });
 });
