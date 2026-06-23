@@ -1,3 +1,4 @@
+import { buildCoinGeckoDemoUrl } from '../coingecko/auth';
 import type { MarketActivitySnapshot } from './types';
 
 const GLOBAL_MARKET_URL = 'https://api.coingecko.com/api/v3/global';
@@ -150,12 +151,7 @@ export class CoinGeckoMarketActivitySource {
   }
 
   private async fetchJson<T>(url: string): Promise<T> {
-    const response = await this.fetchFn(url, {
-      headers: {
-        accept: 'application/json',
-        'x-cg-demo-api-key': this.apiKey,
-      },
-    });
+    const response = await this.fetchFn(buildCoinGeckoDemoUrl(url, this.apiKey));
 
     if (response.status === 401 || response.status === 403) {
       throw new Error('CoinGecko API key is invalid');

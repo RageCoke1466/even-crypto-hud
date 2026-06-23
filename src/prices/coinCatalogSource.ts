@@ -1,4 +1,5 @@
 import type { CoinCatalogEntry } from '../settings/watchlistStore';
+import { buildCoinGeckoDemoUrl } from '../coingecko/auth';
 
 const COIN_LIST_URL = 'https://api.coingecko.com/api/v3/coins/list';
 
@@ -25,12 +26,7 @@ export class CoinGeckoCoinCatalogSource {
   }
 
   async getCoins(): Promise<CoinCatalogEntry[]> {
-    const response = await this.fetchFn(COIN_LIST_URL, {
-      headers: {
-        accept: 'application/json',
-        'x-cg-demo-api-key': this.apiKey,
-      },
-    });
+    const response = await this.fetchFn(buildCoinGeckoDemoUrl(COIN_LIST_URL, this.apiKey));
 
     if (response.status === 401 || response.status === 403) {
       throw new Error('CoinGecko API key is invalid');

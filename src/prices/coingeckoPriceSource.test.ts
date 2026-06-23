@@ -10,7 +10,7 @@ const watchlist: WatchlistCoin[] = [
 ];
 
 describe('CoinGeckoPriceSource', () => {
-  it('fetches a watchlist with the user demo key header', async () => {
+  it('fetches a watchlist with query-string auth to avoid browser preflights', async () => {
     const fetchFn = vi.fn(async () =>
       new Response(
         JSON.stringify({
@@ -35,13 +35,7 @@ describe('CoinGeckoPriceSource', () => {
     const snapshot = await source.getPrices(watchlist);
 
     expect(fetchFn).toHaveBeenCalledWith(
-      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin%2Cethereum%2Csolana%2Cripple&vs_currencies=usd&precision=full',
-      {
-        headers: {
-          accept: 'application/json',
-          'x-cg-demo-api-key': 'cg_demo_123',
-        },
-      },
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin%2Cethereum%2Csolana%2Cripple&vs_currencies=usd&precision=full&x_cg_demo_api_key=cg_demo_123',
     );
     expect(snapshot).toEqual({
       quoteSymbol: 'USD',
