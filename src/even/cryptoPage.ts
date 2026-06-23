@@ -1,10 +1,11 @@
 import {
   CreateStartUpPageContainer,
+  RebuildPageContainer,
   TextContainerProperty,
   TextContainerUpgrade,
   type EvenAppBridge,
 } from '@evenrealities/even_hub_sdk';
-import { getHudActivityRowIndex, type HudText } from '../formatters/priceFormatter';
+import type { HudText } from '../formatters/priceFormatter';
 
 const CONTAINERS = {
   card: { id: 1, name: 'card' },
@@ -20,10 +21,10 @@ const ROW_UPDATE_LENGTH = 32;
 const ACTIVITY_GAUGE_UPDATE_LENGTH = 24;
 const ROW_HEIGHT = 32;
 const ROW_Y_POSITIONS = [82, 119, 156, 193] as const;
+const ACTIVITY_GAUGE_Y_POSITION = ROW_Y_POSITIONS[ROW_Y_POSITIONS.length - 1];
+const CRYPTO_HUD_LAYOUT_KEY = 'fixed-layout';
 
 export function buildCryptoHudPage(text: HudText): CreateStartUpPageContainer {
-  const activityGaugeRowIndex = getHudActivityRowIndex(text);
-
   return new CreateStartUpPageContainer({
     containerTotalNum: 7,
     textObject: [
@@ -62,7 +63,7 @@ export function buildCryptoHudPage(text: HudText): CreateStartUpPageContainer {
       buildActivityGaugeContainer(
         CONTAINERS.activityGauge.id,
         CONTAINERS.activityGauge.name,
-        ROW_Y_POSITIONS[activityGaugeRowIndex] ?? ROW_Y_POSITIONS[ROW_Y_POSITIONS.length - 1],
+        ACTIVITY_GAUGE_Y_POSITION,
         text.activityGauge,
       ),
     ],
@@ -85,12 +86,16 @@ export function buildCryptoHudUpdates(text: HudText): TextContainerUpgrade[] {
   ];
 }
 
-export function getCryptoHudLayoutKey(text: HudText): string {
-  return `activity-row:${getHudActivityRowIndex(text)}`;
+export function getCryptoHudLayoutKey(_text: HudText): string {
+  return CRYPTO_HUD_LAYOUT_KEY;
 }
 
 export async function createCryptoHudPage(bridge: EvenAppBridge, text: HudText) {
   return bridge.createStartUpPageContainer(buildCryptoHudPage(text));
+}
+
+export async function rebuildCryptoHudPage(bridge: EvenAppBridge, text: HudText): Promise<boolean> {
+  return bridge.rebuildPageContainer(new RebuildPageContainer(buildCryptoHudPage(text).toJson()));
 }
 
 export async function updateCryptoHudPage(bridge: EvenAppBridge, text: HudText): Promise<boolean[]> {

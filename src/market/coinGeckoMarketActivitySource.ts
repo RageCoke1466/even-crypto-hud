@@ -141,7 +141,12 @@ export class CoinGeckoMarketActivitySource {
 
     const encodedIds = ids.map((id) => encodeURIComponent(id)).join(',');
     const url = COIN_MARKETS_BY_IDS_URL.replace('{ids}', encodedIds);
-    return parseMarketCoins(await this.fetchJson<CoinGeckoMarketCoin[]>(url)).filter((coin) => !isStablecoin(coin));
+
+    try {
+      return parseMarketCoins(await this.fetchJson<CoinGeckoMarketCoin[]>(url)).filter((coin) => !isStablecoin(coin));
+    } catch {
+      return [];
+    }
   }
 
   private async fetchJson<T>(url: string): Promise<T> {

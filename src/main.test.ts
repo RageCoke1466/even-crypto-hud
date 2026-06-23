@@ -14,6 +14,7 @@ const bridgeState = vi.hoisted(() => ({
     getLocalStorage: vi.fn(),
     setLocalStorage: vi.fn(),
     createStartUpPageContainer: vi.fn(),
+    rebuildPageContainer: vi.fn(),
     textContainerUpgrade: vi.fn(),
     shutDownPageContainer: vi.fn(),
     onEvenHubEvent: vi.fn(),
@@ -119,6 +120,8 @@ describe('phone UI shell', () => {
     bridgeState.bridge.setLocalStorage.mockReset();
     bridgeState.bridge.createStartUpPageContainer.mockReset();
     bridgeState.bridge.createStartUpPageContainer.mockResolvedValue(0);
+    bridgeState.bridge.rebuildPageContainer.mockReset();
+    bridgeState.bridge.rebuildPageContainer.mockResolvedValue(true);
     bridgeState.bridge.textContainerUpgrade.mockReset();
     bridgeState.bridge.textContainerUpgrade.mockResolvedValue(true);
     bridgeState.bridge.shutDownPageContainer.mockReset();
@@ -193,6 +196,47 @@ describe('phone UI shell', () => {
     );
   });
 
+  it('replaces the key-required glasses HUD with loading rows when a key is saved', async () => {
+    bridgeState.hasBridge = true;
+    bridgeState.bridge.getLocalStorage.mockImplementation(async (key: string) => {
+      if (key === 'even-crypto:watchlist') {
+        return JSON.stringify([{ id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' }]);
+      }
+
+      return '';
+    });
+
+    await import('./main');
+    await flushAsyncWork();
+
+    const initialPage = bridgeState.bridge.createStartUpPageContainer.mock.calls.at(-1)?.[0];
+    const initialRows = initialPage.textObject
+      ?.filter((container: { containerName?: string }) => container.containerName?.startsWith('row'))
+      .map((container: { content?: string }) => container.content);
+    const initialRow1Update = bridgeState.bridge.textContainerUpgrade.mock.calls
+      .map((call) => call[0])
+      .find((update) => update.containerName === 'row1');
+
+    expect(initialRows).toEqual(['KEY REQUIRED', 'OPEN PHONE', '', '']);
+    expect(initialRow1Update?.content).toContain('KEY REQUIRED');
+
+    bridgeState.bridge.textContainerUpgrade.mockClear();
+    priceState.nextError = new Error('CoinGecko rate limit reached');
+    const apiKeyInput = document.querySelector<HTMLInputElement>('#coingecko-key');
+    const form = document.querySelector<HTMLFormElement>('.key-form');
+
+    apiKeyInput!.value = 'cg_demo_saved';
+    form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flushAsyncWork();
+
+    const row1Update = bridgeState.bridge.textContainerUpgrade.mock.calls
+      .map((call) => call[0])
+      .find((update) => update.containerName === 'row1');
+
+    expect(row1Update?.content).toContain('BTC   LOADING');
+    expect(document.querySelector('[data-role="message"]')?.textContent).toBe('CoinGecko rate limit reached');
+  });
+
   it('restores a saved watchlist from Even App bridge storage after launch', async () => {
     bridgeState.hasBridge = true;
     bridgeState.bridge.getLocalStorage.mockImplementation(async (key: string) => {
@@ -223,6 +267,49 @@ describe('phone UI shell', () => {
     expect(priceState.requestedCoinIds).toContainEqual(['dogecoin', 'cardano']);
     expect(marketActivityState.requests).toBeGreaterThan(0);
     expect(document.querySelector('[data-role="preview-momentum-region"]')?.textContent).toContain('Market momentum');
+  });
+
+  it('reorders watchlist coins without refetching prices or market activity', async () => {
+    bridgeState.hasBridge = true;
+    bridgeState.bridge.getLocalStorage.mockImplementation(async (key: string) => {
+      if (key === 'even-crypto:coingecko-api-key') {
+        return 'cg_demo_saved';
+      }
+
+      if (key === 'even-crypto:watchlist') {
+        return JSON.stringify([
+          { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+          { id: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
+          { id: 'solana', symbol: 'SOL', name: 'Solana' },
+        ]);
+      }
+
+      return '';
+    });
+
+    await import('./main');
+    await flushAsyncWork();
+
+    const requestCount = priceState.requestedCoinIds.length;
+    const marketActivityRequestCount = marketActivityState.requests;
+    bridgeState.bridge.textContainerUpgrade.mockClear();
+
+    document
+      .querySelector<HTMLButtonElement>('[data-role="watchlist-chip"][data-coin-id="bitcoin"] [data-action="move-coin-down"]')
+      ?.click();
+    await flushAsyncWork();
+
+    const chips = Array.from(document.querySelectorAll<HTMLElement>('[data-role="watchlist-chip"]'));
+    const updates = bridgeState.bridge.textContainerUpgrade.mock.calls.map((call) => call[0]);
+
+    expect(chips.map((chip) => chip.dataset.coinId)).toEqual(['ethereum', 'bitcoin', 'solana']);
+    expect(
+      JSON.parse(window.localStorage.getItem('even-crypto:watchlist') ?? '').map((coin: WatchlistCoin) => coin.id),
+    ).toEqual(['ethereum', 'bitcoin', 'solana']);
+    expect(priceState.requestedCoinIds).toHaveLength(requestCount);
+    expect(marketActivityState.requests).toBe(marketActivityRequestCount);
+    expect(updates.find((update) => update.containerName === 'row1')?.content).toContain('ETH   $1,676.00');
+    expect(updates.find((update) => update.containerName === 'row2')?.content).toContain('BTC   $62,914.00');
   });
 
   it('keeps watchlist prices visible when market activity data is unavailable', async () => {
@@ -326,6 +413,42 @@ describe('phone UI shell', () => {
     expect(document.querySelector('[data-role="message"]')?.textContent).toBe('CoinGecko rate limit reached');
   });
 
+  it('rebuilds an existing native glasses page when startup create is rejected', async () => {
+    bridgeState.hasBridge = true;
+    bridgeState.bridge.createStartUpPageContainer.mockResolvedValue(1);
+    bridgeState.bridge.getLocalStorage.mockImplementation(async (key: string) => {
+      if (key === 'even-crypto:coingecko-api-key') {
+        return 'cg_demo_saved';
+      }
+
+      if (key === 'even-crypto:watchlist') {
+        return JSON.stringify([{ id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' }]);
+      }
+
+      return '';
+    });
+
+    await import('./main');
+    await flushAsyncWork();
+
+    const rebuiltPage = bridgeState.bridge.rebuildPageContainer.mock.calls.at(-1)?.[0];
+    const row1Update = bridgeState.bridge.textContainerUpgrade.mock.calls
+      .map((call) => call[0])
+      .filter((update) => update.containerName === 'row1')
+      .at(-1);
+    const activityGaugeUpdate = bridgeState.bridge.textContainerUpgrade.mock.calls
+      .map((call) => call[0])
+      .filter((update) => update.containerName === 'activityGauge')
+      .at(-1);
+
+    expect(rebuiltPage.textObject?.find((container: { containerName?: string }) => container.containerName === 'row1'))
+      .toMatchObject({
+        content: 'BTC   $62,914.00',
+      });
+    expect(row1Update?.content).toContain('BTC   $62,914.00');
+    expect(activityGaugeUpdate?.content).toContain('QUIET \\---^---/ ACTIVE');
+  });
+
   it('fetches every saved watchlist coin and pages the glasses HUD with scroll gestures', async () => {
     bridgeState.hasBridge = true;
     bridgeState.bridge.getLocalStorage.mockImplementation(async (key: string) => {
@@ -351,12 +474,13 @@ describe('phone UI shell', () => {
     await flushAsyncWork();
 
     const firstPage = bridgeState.bridge.createStartUpPageContainer.mock.calls.at(-1)?.[0];
-    const firstPageTimestamp = firstPage.textObject?.find((container: { containerName?: string }) => {
-      return container.containerName === 'timestamp';
+    const firstPageActivityGauge = firstPage.textObject?.find((container: { containerName?: string }) => {
+      return container.containerName === 'activityGauge';
     });
-    const firstPageRows = firstPage.textObject
-      ?.filter((container: { containerName?: string }) => container.containerName?.startsWith('row'))
-      .map((container: { content?: string }) => container.content);
+    const firstPageUpdates = bridgeState.bridge.textContainerUpgrade.mock.calls.map((call) => call[0]);
+    const latestFirstPageUpdate = (containerName: string) => {
+      return firstPageUpdates.filter((update) => update.containerName === containerName).at(-1);
+    };
 
     expect(priceState.requestedCoinIds).toContainEqual([
       'bitcoin',
@@ -366,57 +490,65 @@ describe('phone UI shell', () => {
       'dogecoin',
       'cardano',
     ]);
-    expect(firstPageTimestamp?.content).toMatch(/^LAST \d{2}:\d{2} P1\/2$/);
-    expect(firstPageRows).toEqual(['BTC   $62,914.00', 'ETH   $1,676.00', 'SOL    $66.00', 'XRP     $1.16']);
+    expect(firstPageActivityGauge).toMatchObject({
+      yPosition: 193,
+    });
+    expect(latestFirstPageUpdate('timestamp')?.content).toMatch(/^LAST \d{2}:\d{2} P1\/2/);
+    expect(latestFirstPageUpdate('row1')?.content).toContain('BTC   $62,914.00');
+    expect(latestFirstPageUpdate('row2')?.content).toContain('ETH   $1,676.00');
+    expect(latestFirstPageUpdate('row3')?.content).toContain('SOL    $66.00');
+    expect(latestFirstPageUpdate('row4')?.content).toContain('XRP     $1.16');
     expect(document.querySelector<HTMLElement>('[data-role="first-four-note"]')?.hidden).toBe(false);
     expect(document.querySelector('[data-role="preview-watchlist-region"]')?.textContent).toContain('Watchlist');
 
     bridgeState.bridge.textContainerUpgrade.mockClear();
     bridgeState.bridge.createStartUpPageContainer.mockClear();
+    bridgeState.bridge.rebuildPageContainer.mockClear();
     const requestCount = priceState.requestedCoinIds.length;
     const marketActivityRequestCount = marketActivityState.requests;
 
     await bridgeState.evenHubCallbacks[0]({ textEvent: { eventType: 2 } });
     await flushAsyncWork();
 
-    const secondPage = bridgeState.bridge.createStartUpPageContainer.mock.calls.at(-1)?.[0];
-    const secondPageTimestamp = secondPage.textObject?.find((container: { containerName?: string }) => {
-      return container.containerName === 'timestamp';
-    });
-    const secondPageRows = secondPage.textObject
-      ?.filter((container: { containerName?: string }) => container.containerName?.startsWith('row'))
-      .map((container: { content?: string }) => container.content);
-    const secondPageActivityGauge = secondPage.textObject?.find((container: { containerName?: string }) => {
-      return container.containerName === 'activityGauge';
-    });
+    const secondPageUpdates = bridgeState.bridge.textContainerUpgrade.mock.calls.map((call) => call[0]);
 
     expect(priceState.requestedCoinIds).toHaveLength(requestCount);
     expect(marketActivityState.requests).toBe(marketActivityRequestCount);
-    expect(bridgeState.bridge.createStartUpPageContainer).toHaveBeenCalledTimes(1);
-    expect(bridgeState.bridge.textContainerUpgrade).not.toHaveBeenCalled();
-    expect(secondPage.containerTotalNum).toBeLessThanOrEqual(8);
-    expect(secondPageTimestamp?.content).toMatch(/^LAST \d{2}:\d{2} P2\/2$/);
-    expect(secondPageRows).toEqual(['DOGE    $1.00', 'ADA     $1.00', '', '']);
-    expect(secondPageActivityGauge).toMatchObject({
-      yPosition: 119,
-      content: 'QUIET \\---^---/ ACTIVE',
-    });
+    expect(bridgeState.bridge.createStartUpPageContainer).not.toHaveBeenCalled();
+    expect(bridgeState.bridge.rebuildPageContainer).not.toHaveBeenCalled();
+    expect(secondPageUpdates.find((update) => update.containerName === 'row1')?.content).toContain('DOGE    $1.00');
+    expect(secondPageUpdates.find((update) => update.containerName === 'row2')?.content).toContain('ADA     $1.00');
+    expect(secondPageUpdates.find((update) => update.containerName === 'row3')?.content).toBe(
+      '                                ',
+    );
+    expect(secondPageUpdates.find((update) => update.containerName === 'row4')?.content).toBe(
+      '                                ',
+    );
+    expect(secondPageUpdates.find((update) => update.containerName === 'timestamp')?.content).toMatch(
+      /^LAST \d{2}:\d{2} P2\/2/,
+    );
+    expect(secondPageUpdates.find((update) => update.containerName === 'activityGauge')?.content).toContain(
+      'QUIET \\---^---/ ACTIVE',
+    );
     expect(document.querySelector('[data-role="preview-watchlist-region"]')?.textContent).toContain('Watchlist');
 
     bridgeState.bridge.textContainerUpgrade.mockClear();
     bridgeState.bridge.createStartUpPageContainer.mockClear();
+    bridgeState.bridge.rebuildPageContainer.mockClear();
 
     await bridgeState.evenHubCallbacks[0]({ textEvent: { eventType: 1 } });
     await flushAsyncWork();
 
-    const firstPageAgain = bridgeState.bridge.createStartUpPageContainer.mock.calls.at(-1)?.[0];
-    const firstPageAgainTimestamp = firstPageAgain.textObject?.find((container: { containerName?: string }) => {
-      return container.containerName === 'timestamp';
-    });
+    const firstPageAgainUpdates = bridgeState.bridge.textContainerUpgrade.mock.calls.map((call) => call[0]);
 
-    expect(bridgeState.bridge.createStartUpPageContainer).toHaveBeenCalledTimes(1);
-    expect(bridgeState.bridge.textContainerUpgrade).not.toHaveBeenCalled();
-    expect(firstPageAgainTimestamp?.content).toMatch(/^LAST \d{2}:\d{2} P1\/2$/);
+    expect(bridgeState.bridge.createStartUpPageContainer).not.toHaveBeenCalled();
+    expect(bridgeState.bridge.rebuildPageContainer).not.toHaveBeenCalled();
+    expect(firstPageAgainUpdates.find((update) => update.containerName === 'row1')?.content).toContain(
+      'BTC   $62,914.00',
+    );
+    expect(firstPageAgainUpdates.find((update) => update.containerName === 'timestamp')?.content).toMatch(
+      /^LAST \d{2}:\d{2} P1\/2/,
+    );
   });
 
   it('registers EvenHub events and opens the system exit dialog on root double-tap', async () => {
