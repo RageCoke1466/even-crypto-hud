@@ -129,6 +129,56 @@ describe('CoinGeckoMarketActivitySource', () => {
     expect(activity.volatilityActivityScore).toBe(6);
   });
 
+  it('keeps the market activity score when trending market details fail', async () => {
+    const fetchFn = vi.fn(async (url: string | URL | Request) => {
+      switch (String(url)) {
+        case GLOBAL_MARKET_URL:
+          return jsonResponse({
+            data: {
+              total_market_cap: { usd: 1000 },
+              total_volume: { usd: 50 },
+              updated_at: 1779878351,
+            },
+          });
+        case TOP_MARKETS_URL:
+          return jsonResponse([
+            {
+              id: 'bitcoin',
+              symbol: 'btc',
+              market_cap: 600,
+              total_volume: 30,
+              price_change_percentage_24h: 4,
+            },
+            {
+              id: 'ethereum',
+              symbol: 'eth',
+              market_cap: 400,
+              total_volume: 20,
+              price_change_percentage_24h: -4,
+            },
+          ]);
+        case TRENDING_URL:
+          return jsonResponse({
+            coins: [{ item: { id: 'bitcoin' } }, { item: { id: 'solana' } }],
+          });
+        case TRENDING_MARKETS_URL:
+          throw new TypeError('Load failed');
+        default:
+          throw new Error(`Unexpected URL: ${String(url)}`);
+      }
+    });
+    const source = new CoinGeckoMarketActivitySource({ apiKey: 'cg_demo_123', fetchFn });
+
+    await expect(source.getLatest()).resolves.toEqual({
+      score: 44,
+      volumeActivityScore: 38,
+      volatilityActivityScore: 76,
+      trendingActivityScore: 0,
+      updatedAt: new Date('2026-05-27T10:39:11.000Z'),
+      provider: 'coingecko',
+    });
+  });
+
   it('reports rate-limit failures as stable messages', async () => {
     const fetchFn = vi.fn(async () => new Response('nope', { status: 429 }));
     const source = new CoinGeckoMarketActivitySource({ apiKey: 'cg_demo_123', fetchFn });
