@@ -556,6 +556,7 @@ async function syncGlasses(hudText: HudText): Promise<void> {
 }
 
 function renderState(state: CryptoAppState): void {
+  currentHudText = state.hudText;
   elements.message.textContent = state.message;
 }
 

@@ -7,12 +7,13 @@ const TOP_MARKETS_URL =
 const TRENDING_URL = 'https://api.coingecko.com/api/v3/search/trending';
 const TRENDING_MARKETS_URL =
   'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,solana&price_change_percentage=24h';
+const API_KEY = 'cg_demo_123';
 
 describe('CoinGeckoMarketActivitySource', () => {
   it('combines volume, volatility, and trending activity into a CoinGecko-only score', async () => {
     const fetchFn = vi.fn(async (url: string | URL | Request) => {
       switch (String(url)) {
-        case GLOBAL_MARKET_URL:
+        case withDemoKey(GLOBAL_MARKET_URL):
           return jsonResponse({
             data: {
               total_market_cap: { usd: 1000 },
@@ -20,7 +21,7 @@ describe('CoinGeckoMarketActivitySource', () => {
               updated_at: 1779878351,
             },
           });
-        case TOP_MARKETS_URL:
+        case withDemoKey(TOP_MARKETS_URL):
           return jsonResponse([
             {
               id: 'bitcoin',
@@ -44,7 +45,7 @@ describe('CoinGeckoMarketActivitySource', () => {
               price_change_percentage_24h: 20,
             },
           ]);
-        case TRENDING_URL:
+        case withDemoKey(TRENDING_URL):
           return jsonResponse({
             coins: [
               { item: { id: 'bitcoin' } },
@@ -52,7 +53,7 @@ describe('CoinGeckoMarketActivitySource', () => {
               { item: { id: 'solana' } },
             ],
           });
-        case TRENDING_MARKETS_URL:
+        case withDemoKey(TRENDING_MARKETS_URL):
           return jsonResponse([
             {
               id: 'bitcoin',
@@ -73,7 +74,7 @@ describe('CoinGeckoMarketActivitySource', () => {
           throw new Error(`Unexpected URL: ${String(url)}`);
       }
     });
-    const source = new CoinGeckoMarketActivitySource({ apiKey: 'cg_demo_123', fetchFn });
+    const source = new CoinGeckoMarketActivitySource({ apiKey: API_KEY, fetchFn });
 
     await expect(source.getLatest()).resolves.toEqual({
       score: 56,
@@ -85,12 +86,7 @@ describe('CoinGeckoMarketActivitySource', () => {
     });
     expect(fetchFn).toHaveBeenCalledTimes(4);
     for (const url of [GLOBAL_MARKET_URL, TOP_MARKETS_URL, TRENDING_URL, TRENDING_MARKETS_URL]) {
-      expect(fetchFn).toHaveBeenCalledWith(url, {
-        headers: {
-          accept: 'application/json',
-          'x-cg-demo-api-key': 'cg_demo_123',
-        },
-      });
+      expect(fetchFn).toHaveBeenCalledWith(withDemoKey(url));
     }
   });
 
@@ -122,7 +118,7 @@ describe('CoinGeckoMarketActivitySource', () => {
       trending: { coins: [] },
       trendingMarkets: [],
     });
-    const source = new CoinGeckoMarketActivitySource({ apiKey: 'cg_demo_123', fetchFn });
+    const source = new CoinGeckoMarketActivitySource({ apiKey: API_KEY, fetchFn });
 
     const activity = await source.getLatest();
 
@@ -132,7 +128,7 @@ describe('CoinGeckoMarketActivitySource', () => {
   it('keeps the market activity score when trending market details fail', async () => {
     const fetchFn = vi.fn(async (url: string | URL | Request) => {
       switch (String(url)) {
-        case GLOBAL_MARKET_URL:
+        case withDemoKey(GLOBAL_MARKET_URL):
           return jsonResponse({
             data: {
               total_market_cap: { usd: 1000 },
@@ -140,7 +136,7 @@ describe('CoinGeckoMarketActivitySource', () => {
               updated_at: 1779878351,
             },
           });
-        case TOP_MARKETS_URL:
+        case withDemoKey(TOP_MARKETS_URL):
           return jsonResponse([
             {
               id: 'bitcoin',
@@ -157,17 +153,17 @@ describe('CoinGeckoMarketActivitySource', () => {
               price_change_percentage_24h: -4,
             },
           ]);
-        case TRENDING_URL:
+        case withDemoKey(TRENDING_URL):
           return jsonResponse({
             coins: [{ item: { id: 'bitcoin' } }, { item: { id: 'solana' } }],
           });
-        case TRENDING_MARKETS_URL:
+        case withDemoKey(TRENDING_MARKETS_URL):
           throw new TypeError('Load failed');
         default:
           throw new Error(`Unexpected URL: ${String(url)}`);
       }
     });
-    const source = new CoinGeckoMarketActivitySource({ apiKey: 'cg_demo_123', fetchFn });
+    const source = new CoinGeckoMarketActivitySource({ apiKey: API_KEY, fetchFn });
 
     await expect(source.getLatest()).resolves.toEqual({
       score: 44,
@@ -181,7 +177,7 @@ describe('CoinGeckoMarketActivitySource', () => {
 
   it('reports rate-limit failures as stable messages', async () => {
     const fetchFn = vi.fn(async () => new Response('nope', { status: 429 }));
-    const source = new CoinGeckoMarketActivitySource({ apiKey: 'cg_demo_123', fetchFn });
+    const source = new CoinGeckoMarketActivitySource({ apiKey: API_KEY, fetchFn });
 
     await expect(source.getLatest()).rejects.toThrow('CoinGecko market activity rate limit reached');
   });
@@ -193,7 +189,7 @@ describe('CoinGeckoMarketActivitySource', () => {
       trending: { coins: [] },
       trendingMarkets: [],
     });
-    const source = new CoinGeckoMarketActivitySource({ apiKey: 'cg_demo_123', fetchFn });
+    const source = new CoinGeckoMarketActivitySource({ apiKey: API_KEY, fetchFn });
 
     await expect(source.getLatest()).rejects.toThrow(
       'CoinGecko market activity response did not include a valid total market cap',
@@ -209,11 +205,11 @@ function buildFetchFn(fixtures: {
 }) {
   return vi.fn(async (url: string | URL | Request) => {
     switch (String(url)) {
-      case GLOBAL_MARKET_URL:
+      case withDemoKey(GLOBAL_MARKET_URL):
         return jsonResponse(fixtures.global);
-      case TOP_MARKETS_URL:
+      case withDemoKey(TOP_MARKETS_URL):
         return jsonResponse(fixtures.topMarkets);
-      case TRENDING_URL:
+      case withDemoKey(TRENDING_URL):
         return jsonResponse(fixtures.trending);
       default:
         return jsonResponse(fixtures.trendingMarkets);
@@ -226,4 +222,10 @@ function jsonResponse(body: unknown): Response {
     status: 200,
     headers: { 'content-type': 'application/json' },
   });
+}
+
+function withDemoKey(url: string): string {
+  const authenticatedUrl = new URL(url);
+  authenticatedUrl.searchParams.set('x_cg_demo_api_key', API_KEY);
+  return authenticatedUrl.toString();
 }

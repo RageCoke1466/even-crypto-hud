@@ -1,4 +1,5 @@
 import type { WatchlistCoin } from '../settings/watchlistStore';
+import { buildCoinGeckoDemoUrl } from '../coingecko/auth';
 import type { CryptoPriceSnapshot, CryptoWatchlistSnapshot, PriceProvider } from './types';
 
 const SIMPLE_PRICE_URL = 'https://api.coingecko.com/api/v3/simple/price';
@@ -33,12 +34,7 @@ export class CoinGeckoPriceSource implements PriceProvider {
       precision: 'full',
     });
 
-    const response = await this.fetchFn(`${SIMPLE_PRICE_URL}?${params.toString()}`, {
-      headers: {
-        accept: 'application/json',
-        'x-cg-demo-api-key': this.apiKey,
-      },
-    });
+    const response = await this.fetchFn(buildCoinGeckoDemoUrl(`${SIMPLE_PRICE_URL}?${params.toString()}`, this.apiKey));
 
     if (response.status === 401 || response.status === 403) {
       throw new Error('CoinGecko API key is invalid');

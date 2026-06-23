@@ -25,6 +25,7 @@ const priceState = vi.hoisted(() => ({
   requestedApiKeys: [] as string[],
   requestedCoinIds: [] as string[][],
   nextError: null as Error | null,
+  holdNextRequest: false,
 }));
 
 const marketActivityState = vi.hoisted(() => ({
@@ -61,6 +62,11 @@ vi.mock('./prices/coingeckoPriceSource', () => ({
 
     async getPrices(coins: WatchlistCoin[]) {
       priceState.requestedCoinIds.push(coins.map((coin) => coin.id));
+
+      if (priceState.holdNextRequest) {
+        priceState.holdNextRequest = false;
+        return new Promise(() => undefined);
+      }
 
       if (priceState.nextError) {
         const error = priceState.nextError;
@@ -135,6 +141,7 @@ describe('phone UI shell', () => {
     priceState.requestedApiKeys = [];
     priceState.requestedCoinIds = [];
     priceState.nextError = null;
+    priceState.holdNextRequest = false;
     marketActivityState.requests = 0;
     marketActivityState.nextError = null;
 
@@ -235,6 +242,30 @@ describe('phone UI shell', () => {
 
     expect(row1Update?.content).toContain('BTC   LOADING');
     expect(document.querySelector('[data-role="message"]')?.textContent).toBe('CoinGecko rate limit reached');
+  });
+
+  it('shows loading on glasses while launching with a saved local key before prices resolve', async () => {
+    bridgeState.hasBridge = true;
+    bridgeState.bridge.getLocalStorage.mockResolvedValue('');
+    bridgeState.bridge.setLocalStorage.mockResolvedValue(true);
+    priceState.holdNextRequest = true;
+    window.localStorage.setItem('even-crypto:coingecko-api-key', 'cg_demo_saved');
+    window.localStorage.setItem(
+      'even-crypto:watchlist',
+      JSON.stringify([{ id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' }]),
+    );
+
+    await import('./main');
+    await flushAsyncWork();
+
+    const initialPage = bridgeState.bridge.createStartUpPageContainer.mock.calls.at(-1)?.[0];
+    const initialRows = initialPage.textObject
+      ?.filter((container: { containerName?: string }) => container.containerName?.startsWith('row'))
+      .map((container: { content?: string }) => container.content);
+
+    expect(priceState.requestedCoinIds).toContainEqual(['bitcoin']);
+    expect(initialRows).toEqual(['BTC   LOADING', '', '', '']);
+    expect(document.querySelector('[data-role="message"]')?.textContent).toBe('Fetching BTC from CoinGecko...');
   });
 
   it('restores a saved watchlist from Even App bridge storage after launch', async () => {
